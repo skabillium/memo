@@ -9,6 +9,8 @@ import (
 const MemoVersion = "0.0.1"
 const DefaultPort = "5678"
 
+var Queues = map[string]*Queue{}
+
 func execute(message string, conn net.Conn) {
 	split := strings.Split(message, " ")
 	cmd := split[0]
@@ -33,6 +35,34 @@ func execute(message string, conn net.Conn) {
 		}
 	case "del":
 		Delete(split[1])
+	case "qadd":
+		var q *Queue
+		name := split[1]
+		q, found := Queues[name]
+		if !found {
+			q = NewQueue()
+		}
+
+		q.Enqueue(split[2])
+		if !found {
+			Queues[name] = q
+		}
+	case "qpop":
+		name := split[1]
+		q, found := Queues[name]
+		if !found {
+			break
+		}
+
+		res = fmt.Sprintln(q.Dequeue())
+	case "qlen":
+		name := split[1]
+		q, found := Queues[name]
+		if !found {
+			break
+		}
+
+		res = fmt.Sprintln(q.Length)
 	default:
 		res = fmt.Sprintf("Unknown command '%s'\n", cmd)
 	}
@@ -42,6 +72,7 @@ func execute(message string, conn net.Conn) {
 
 func handleClient(conn net.Conn) {
 	defer conn.Close()
+	conn.Write([]byte("Connected to Memo server version " + MemoVersion + "\n"))
 
 	buffer := make([]byte, 1024)
 	for {
