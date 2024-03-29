@@ -13,7 +13,7 @@ const DefaultPort = "5678"
 var Queues = map[string]*Queue{}
 var PQueues = map[string]*PriorityQueue{}
 
-func execute(message string, conn net.Conn) bool {
+func execute(message string, conn net.Conn) {
 	split := strings.Split(message, " ")
 	cmd := split[0]
 
@@ -21,8 +21,6 @@ func execute(message string, conn net.Conn) bool {
 	switch cmd {
 	case "version":
 		res = "Memo server version " + MemoVersion + "\n"
-	case "exit":
-		return true
 	case "set":
 		Set(split[1], split[2])
 	case "get":
@@ -106,28 +104,29 @@ func execute(message string, conn net.Conn) bool {
 	}
 
 	conn.Write([]byte(res))
-	return false
 }
 
 func handleClient(conn net.Conn) {
 	defer conn.Close()
-	conn.Write([]byte("Connected to Memo server version " + MemoVersion + "\n"))
 
-	buffer := make([]byte, 1024)
+	totalBytes := 0
+	messageBytes := []byte{}
 	for {
+		buffer := make([]byte, 1024)
 		// Read data from the client
 		n, err := conn.Read(buffer)
-		if err != nil {
-			if err.Error() == "EOF" {
-				return
-			}
+		if err != nil && err.Error() != "EOF" {
 			panic(err)
 		}
 
-		message := strings.ReplaceAll(string(buffer[:n]), "\n", "")
-		exit := execute(message, conn)
-		if exit {
-			break
+		totalBytes += n
+		messageBytes = append(messageBytes, buffer[:n]...)
+		message := strings.ReplaceAll(string(messageBytes), "\n", "")
+
+		// Only execute when encountering an EOF
+		if err != nil {
+			execute(message, conn)
+			return
 		}
 	}
 }
