@@ -21,6 +21,18 @@ func execute(message string, conn net.Conn) {
 	switch cmd {
 	case "version":
 		res = "Memo server version " + MemoVersion + "\n"
+	case "ping":
+		res = "pong\n"
+	case "keys":
+		for k := range KV {
+			res += k + "\n"
+		}
+		for q := range Queues {
+			res += q + "\n"
+		}
+		for q := range PQueues {
+			res += q + "\n"
+		}
 	case "set":
 		Set(split[1], split[2])
 	case "get":
@@ -106,11 +118,50 @@ func execute(message string, conn net.Conn) {
 	conn.Write([]byte(res))
 }
 
-func handleClient(conn net.Conn) {
+type Server struct {
+	port   string
+	ln     net.Listener
+	quitCh chan struct{}
+}
+
+func NewServer(port string) *Server {
+	return &Server{port: port, quitCh: make(chan struct{})}
+}
+
+func (s *Server) Start() error {
+	ln, err := net.Listen("tcp", "localhost:"+s.port)
+	if err != nil {
+		return err
+	}
+	defer ln.Close()
+
+	fmt.Println("Memo server started on port", s.port)
+
+	s.ln = ln
+	go s.acceptLoop()
+	<-s.quitCh
+
+	return nil
+}
+
+// TODO: Maybe keep connection open instead of request-response pattern
+func (s *Server) acceptLoop() {
+	for {
+		conn, err := s.ln.Accept()
+		if err != nil {
+			fmt.Println("Accept error:", err)
+			continue
+		}
+
+		go s.handleConnection(conn)
+	}
+}
+
+func (s *Server) handleConnection(conn net.Conn) {
 	defer conn.Close()
 
 	totalBytes := 0
-	messageBytes := []byte{}
+	payload := []byte{}
 	for {
 		buffer := make([]byte, 1024)
 		// Read data from the client
@@ -120,8 +171,8 @@ func handleClient(conn net.Conn) {
 		}
 
 		totalBytes += n
-		messageBytes = append(messageBytes, buffer[:n]...)
-		message := strings.ReplaceAll(string(messageBytes), "\n", "")
+		payload = append(payload, buffer[:n]...)
+		message := strings.ReplaceAll(string(payload), "\n", "")
 
 		// Only execute when encountering an EOF
 		if err != nil {
@@ -129,21 +180,10 @@ func handleClient(conn net.Conn) {
 			return
 		}
 	}
+
 }
 
 func main() {
-	listener, err := net.Listen("tcp", "localhost:"+DefaultPort)
-	if err != nil {
-		panic(err)
-	}
-	defer listener.Close()
-
-	fmt.Printf("Memo server is listening on port %s\n", DefaultPort)
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			panic(err)
-		}
-		go handleClient(conn)
-	}
+	server := NewServer(DefaultPort)
+	server.Start()
 }
