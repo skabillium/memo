@@ -10,19 +10,35 @@ import (
 const MemoVersion = "0.0.1"
 const DefaultPort = "5678"
 
+type MemoContext struct {
+	conn net.Conn
+}
+
+func NewMemoContext(conn net.Conn) *MemoContext {
+	return &MemoContext{conn: conn}
+}
+
+func (c *MemoContext) Writeln(message string) {
+	c.conn.Write([]byte(message + "\n"))
+}
+
+func (c *MemoContext) Error(err string) {
+	c.Writeln("[ERROR]: " + err)
+}
+
 var Queues = map[string]*Queue{}
 var PQueues = map[string]*PriorityQueue{}
 
-func execute(message string, conn net.Conn) {
+func execute(ctx *MemoContext, message string) {
 	split := strings.Split(message, " ")
 	cmd := split[0]
 
 	var res string
 	switch cmd {
 	case "version":
-		res = "Memo server version " + MemoVersion + "\n"
+		ctx.Writeln("Memo server version " + MemoVersion)
 	case "ping":
-		res = "pong\n"
+		ctx.Writeln("pong")
 	case "keys":
 		for k := range KV {
 			res += k + "\n"
@@ -33,23 +49,44 @@ func execute(message string, conn net.Conn) {
 		for q := range PQueues {
 			res += q + "\n"
 		}
+		ctx.Writeln(res)
 	case "set":
+		if len(split) != 3 {
+			ctx.Error("Invalid number of arguments for 'set' command")
+			return
+		}
+
 		Set(split[1], split[2])
 	case "get":
+		if len(split) != 2 {
+			ctx.Error("Invalid number of arguments for 'get' command")
+			return
+		}
+
 		value, found := Get(split[1])
 		if !found {
-			res = "<nil>\n"
+			ctx.Writeln("<nil>")
 		} else {
-			res = fmt.Sprintf("%s\n", value)
+			ctx.Writeln(fmt.Sprint(value))
 		}
 	case "list", "ls":
 		entries := List()
 		for i := 0; i < len(entries); i++ {
 			res += fmt.Sprintf("'%s':'%s'\n", entries[i][0], entries[i][1])
 		}
+		ctx.Writeln(res)
 	case "del":
+		if len(split) != 2 {
+			ctx.Error("Invalid number of arguments for 'del' command")
+			return
+		}
 		Delete(split[1])
 	case "qadd":
+		if len(split) != 3 {
+			ctx.Error("Incalid number of arguments for 'qadd' command")
+			return
+		}
+
 		var q *Queue
 		name := split[1]
 		q, found := Queues[name]
@@ -62,22 +99,37 @@ func execute(message string, conn net.Conn) {
 			Queues[name] = q
 		}
 	case "qpop":
+		if len(split) != 2 {
+			ctx.Error("Invalid number of arguments for 'qpop' command")
+			return
+		}
+
 		name := split[1]
 		q, found := Queues[name]
 		if !found {
 			break
 		}
 
-		res = fmt.Sprintln(q.Dequeue())
+		ctx.Writeln(q.Dequeue())
 	case "qlen":
+		if len(split) != 2 {
+			ctx.Error("Invalid number of arguments for 'qlen' command")
+			return
+		}
+
 		name := split[1]
 		q, found := Queues[name]
 		if !found {
 			break
 		}
 
-		res = fmt.Sprintln(q.Length)
+		ctx.Writeln(fmt.Sprint(q.Length))
 	case "pqadd":
+		if len(split) != 4 {
+			ctx.Error("Invalid number of arguments for 'pqadd' command")
+			return
+		}
+
 		var pq *PriorityQueue
 		name := split[1]
 		pq, found := PQueues[name]
@@ -87,8 +139,8 @@ func execute(message string, conn net.Conn) {
 
 		priority, err := strconv.Atoi(split[3])
 		if err != nil {
-			res = fmt.Sprintln("Could not convert", split[3], "to an integer")
-			break
+			ctx.Error(fmt.Sprintf("Could not convert '%s' to an integer", split[3]))
+			return
 		}
 
 		pq.Enqueue(split[2], priority)
@@ -96,26 +148,34 @@ func execute(message string, conn net.Conn) {
 			PQueues[name] = pq
 		}
 	case "pqpop":
+		if len(split) != 2 {
+			ctx.Error("Invalid number of arguments for 'pqpop' command")
+			return
+		}
+
 		name := split[1]
 		pq, found := PQueues[name]
 		if !found {
 			break
 		}
 
-		res = fmt.Sprintln(pq.Dequeue())
+		ctx.Writeln(pq.Dequeue())
 	case "pqlen":
+		if len(split) != 2 {
+			ctx.Error("Invalid number of arguments for 'pqlen' command")
+			return
+		}
+
 		name := split[1]
 		pq, found := PQueues[name]
 		if !found {
 			break
 		}
 
-		res = fmt.Sprintln(pq.Length)
+		ctx.Writeln(fmt.Sprint(pq.Length))
 	default:
-		res = fmt.Sprintf("Unknown command '%s'\n", cmd)
+		ctx.Writeln(fmt.Sprintf("Unknown command '%s'", cmd))
 	}
-
-	conn.Write([]byte(res))
 }
 
 type Server struct {
@@ -167,7 +227,8 @@ func (s *Server) handleConnection(conn net.Conn) {
 		// Read data from the client
 		n, err := conn.Read(buffer)
 		if err != nil && err.Error() != "EOF" {
-			panic(err)
+			fmt.Println("Error while reading data for connection")
+			return
 		}
 
 		totalBytes += n
@@ -176,7 +237,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 
 		// Only execute when encountering an EOF
 		if err != nil {
-			execute(message, conn)
+			execute(NewMemoContext(conn), message)
 			return
 		}
 	}
