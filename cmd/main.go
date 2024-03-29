@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 )
 
@@ -10,6 +11,7 @@ const MemoVersion = "0.0.1"
 const DefaultPort = "5678"
 
 var Queues = map[string]*Queue{}
+var PQueues = map[string]*PriorityQueue{}
 
 func execute(message string, conn net.Conn) {
 	split := strings.Split(message, " ")
@@ -63,6 +65,40 @@ func execute(message string, conn net.Conn) {
 		}
 
 		res = fmt.Sprintln(q.Length)
+	case "pqadd":
+		var pq *PriorityQueue
+		name := split[1]
+		pq, found := PQueues[name]
+		if !found {
+			pq = NewPriorityQueue()
+		}
+
+		priority, err := strconv.Atoi(split[3])
+		if err != nil {
+			res = fmt.Sprintln("Could not convert", split[3], "to an integer")
+			break
+		}
+
+		pq.Enqueue(split[2], priority)
+		if !found {
+			PQueues[name] = pq
+		}
+	case "pqpop":
+		name := split[1]
+		pq, found := PQueues[name]
+		if !found {
+			break
+		}
+
+		res = fmt.Sprintln(pq.Dequeue())
+	case "pqlen":
+		name := split[1]
+		pq, found := PQueues[name]
+		if !found {
+			break
+		}
+
+		res = fmt.Sprintln(pq.Length)
 	default:
 		res = fmt.Sprintf("Unknown command '%s'\n", cmd)
 	}
