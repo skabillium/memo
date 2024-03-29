@@ -13,7 +13,7 @@ const DefaultPort = "5678"
 var Queues = map[string]*Queue{}
 var PQueues = map[string]*PriorityQueue{}
 
-func execute(message string, conn net.Conn) {
+func execute(message string, conn net.Conn) bool {
 	split := strings.Split(message, " ")
 	cmd := split[0]
 
@@ -21,6 +21,8 @@ func execute(message string, conn net.Conn) {
 	switch cmd {
 	case "version":
 		res = "Memo server version " + MemoVersion + "\n"
+	case "exit":
+		return true
 	case "set":
 		Set(split[1], split[2])
 	case "get":
@@ -104,6 +106,7 @@ func execute(message string, conn net.Conn) {
 	}
 
 	conn.Write([]byte(res))
+	return false
 }
 
 func handleClient(conn net.Conn) {
@@ -122,7 +125,10 @@ func handleClient(conn net.Conn) {
 		}
 
 		message := strings.ReplaceAll(string(buffer[:n]), "\n", "")
-		execute(message, conn)
+		exit := execute(message, conn)
+		if exit {
+			break
+		}
 	}
 }
 
