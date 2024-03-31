@@ -12,11 +12,12 @@ const MemoVersion = "0.0.1"
 const DefaultPort = "5678"
 
 type MemoContext struct {
-	conn net.Conn
+	conn    net.Conn
+	Message string
 }
 
-func NewMemoContext(conn net.Conn) *MemoContext {
-	return &MemoContext{conn: conn}
+func NewMemoContext(conn net.Conn, message string) *MemoContext {
+	return &MemoContext{conn: conn, Message: message}
 }
 
 func (c *MemoContext) Writeln(message string) {
@@ -59,180 +60,205 @@ type Command struct {
 	Priority int
 }
 
-// TODO: Parse multiple commands
-func ParseCommand(message string) (*Command, error) {
+func ParseCommands(message string) ([]Command, error) {
+	message = strings.Trim(message, " \t\n")
+	message = strings.ReplaceAll(message, "\n", " ")
+
 	if message == "" {
 		return nil, errors.New("empty message")
 	}
 
 	split := strings.Split(message, " ")
-	cmd := split[0]
-	switch cmd {
-	case "version":
-		return &Command{Kind: CmdVersion}, nil
-	case "ping":
-		return &Command{Kind: CmdPing}, nil
-	case "keys":
-		return &Command{Kind: CmdKeys}, nil
-	case "set":
-		if len(split) != 3 {
-			return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-		}
-		return &Command{Kind: CmdSet, Key: split[1], Value: split[2]}, nil
-	case "get":
-		if len(split) != 2 {
-			return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-		}
-		return &Command{Kind: CmdGet, Key: split[1]}, nil
-	case "del":
-		if len(split) != 2 {
-			return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-		}
-		return &Command{Kind: CmdDel, Key: split[1]}, nil
-	case "list", "ls":
-		return &Command{Kind: CmdList}, nil
-	case "qadd":
-		if len(split) != 3 {
-			return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-		}
-		return &Command{Kind: CmdQueueAdd, Key: split[2]}, nil
-	case "qpop":
-		if len(split) != 2 {
-			return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-		}
-		return &Command{Kind: CmdQueuePop, Key: split[1]}, nil
-	case "qlen":
-		if len(split) != 2 {
-			return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-		}
-		return &Command{Kind: CmdQueueLen, Key: split[1]}, nil
-	case "pqadd":
-		if len(split) < 3 {
-			return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-		}
-
-		pqadd := &Command{Kind: CmdPQAdd, Key: split[1], Value: split[2], Priority: 1}
-		if len(split) == 4 {
-			priority, err := strconv.Atoi(split[3])
-			if err != nil {
-				return nil, fmt.Errorf("could not convert '%s' to integer", split[3])
+	commands := []Command{}
+	i := 0
+	for i < len(split) {
+		cmd := split[i]
+		switch cmd {
+		case "version":
+			commands = append(commands, Command{Kind: CmdVersion})
+		case "ping":
+			commands = append(commands, Command{Kind: CmdPing})
+		case "keys":
+			commands = append(commands, Command{Kind: CmdKeys})
+		case "set":
+			// Needs another 2 arguments
+			if i+2 > len(split) {
+				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
+			}
+			commands = append(commands, Command{Kind: CmdSet, Key: split[i+1], Value: split[i+2]})
+			i += 2
+		case "get":
+			if i+1 > len(split) {
+				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
+			}
+			commands = append(commands, Command{Kind: CmdGet, Key: split[i+1]})
+			i += 1
+		case "del":
+			if i+1 > len(split) {
+				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
+			}
+			commands = append(commands, Command{Kind: CmdDel, Key: split[i+1]})
+			i += 1
+		case "list", "ls":
+			commands = append(commands, Command{Kind: CmdList})
+		case "qadd":
+			if i+2 > len(split) {
+				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
+			}
+			commands = append(commands, Command{Kind: CmdQueueAdd, Key: split[i+1], Value: split[i+2]})
+			i += 2
+		case "qpop":
+			if i+1 > len(split) {
+				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
+			}
+			commands = append(commands, Command{Kind: CmdQueuePop, Key: split[i+1]})
+			i += 1
+		case "qlen":
+			if i+1 > len(split) {
+				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
+			}
+			commands = append(commands, Command{Kind: CmdQueueLen, Key: split[i+1]})
+			i += 1
+		case "pqadd":
+			if i+2 > len(split) {
+				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
 			}
 
-			if priority <= 0 {
-				return nil, fmt.Errorf("received invalid negative value '%d' for priority", priority)
+			pqadd := Command{Kind: CmdPQAdd, Key: split[i+1], Value: split[i+2], Priority: 1}
+			// TODO: Refactor this
+			if i+3 < len(split) {
+				if priority, err := strconv.Atoi(split[i+3]); err == nil {
+					pqadd.Priority = priority
+					i += 3
+					commands = append(commands, pqadd)
+				} else {
+					commands = append(commands, pqadd)
+					i += 2
+				}
+
+			} else {
+				commands = append(commands, pqadd)
+				i += 2
 			}
-
-			pqadd.Priority = priority
+		case "pqpop":
+			if i+1 > len(split) {
+				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
+			}
+			commands = append(commands, Command{Kind: CmdPQPop, Key: split[i+1]})
+			i += 1
+		case "pqlen":
+			if i+1 > len(split) {
+				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
+			}
+			commands = append(commands, Command{Kind: CmdPQLen, Key: split[i+1]})
+			i += 1
+		default:
+			if cmd == "" {
+				break
+			}
+			return nil, fmt.Errorf("unknown command: '%s'", cmd)
 		}
-
-		return pqadd, nil
-	case "pqpop":
-		if len(split) != 2 {
-			return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-		}
-		return &Command{Kind: CmdPQPop, Key: split[1]}, nil
-	case "pqlen":
-		if len(split) != 2 {
-			return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-		}
-		return &Command{Kind: CmdPQLen, Key: split[1]}, nil
+		i++
 	}
 
-	return nil, fmt.Errorf("unknown command '%s'", cmd)
+	return commands, nil
 }
 
-func Execute(ctx *MemoContext, message string) {
-	cmd, err := ParseCommand(message)
+func Execute(ctx *MemoContext) {
+	commands, err := ParseCommands(ctx.Message)
 	if err != nil {
 		ctx.Error(err.Error())
 		return
 	}
 
-	var res string
-	switch cmd.Kind {
-	case CmdVersion:
-		ctx.Writeln(MemoVersion)
-	case CmdPing:
-		ctx.Writeln("pong")
-	case CmdKeys:
-		for k := range KV {
-			res += k + "\n"
-		}
-		for q := range Queues {
-			res += q + "\n"
-		}
-		for q := range PQueues {
-			res += q + "\n"
-		}
-		ctx.Writeln(res)
-	case CmdSet:
-		Set(cmd.Key, cmd.Value)
-	case CmdGet:
-		value, found := Get(cmd.Key)
-		if !found {
-			ctx.Writeln("<nil>")
-			return
-		}
+	for _, cmd := range commands {
+		switch cmd.Kind {
+		case CmdVersion:
+			ctx.Writeln(MemoVersion)
+		case CmdPing:
+			ctx.Writeln("pong")
+		case CmdKeys:
+			var res string
+			for k := range KV {
+				res += k + "\n"
+			}
+			for q := range Queues {
+				res += q + "\n"
+			}
+			for q := range PQueues {
+				res += q + "\n"
+			}
+			ctx.Writeln(res)
+		case CmdSet:
+			Set(cmd.Key, cmd.Value)
+		case CmdGet:
+			value, found := Get(cmd.Key)
+			if !found {
+				ctx.Writeln("<nil>")
+				break
+			}
 
-		ctx.Writeln(fmt.Sprint(value))
-	case CmdList:
-		entries := List()
-		for i := 0; i < len(entries); i++ {
-			res += fmt.Sprintf("'%s':'%s'\n", entries[i][0], entries[i][1])
-		}
-		ctx.Writeln(res)
-	case CmdDel:
-		Delete(cmd.Key)
-	case CmdQueueAdd:
-		var q *Queue
-		q, found := Queues[cmd.Key]
-		if !found {
-			q = NewQueue()
-		}
+			ctx.Writeln(value)
+		case CmdList:
+			entries := List()
+			var res string
+			for i := 0; i < len(entries); i++ {
+				res += fmt.Sprintf("'%s':'%s'\n", entries[i][0], entries[i][1])
+			}
+			ctx.Writeln(res)
+		case CmdDel:
+			Delete(cmd.Key)
+		case CmdQueueAdd:
+			var q *Queue
+			q, found := Queues[cmd.Key]
+			if !found {
+				q = NewQueue()
+			}
 
-		q.Enqueue(cmd.Value)
-		if !found {
-			Queues[cmd.Key] = q
-		}
-	case CmdQueuePop:
-		q, found := Queues[cmd.Key]
-		if !found {
-			break
-		}
+			q.Enqueue(cmd.Value)
+			if !found {
+				Queues[cmd.Key] = q
+			}
+		case CmdQueuePop:
+			q, found := Queues[cmd.Key]
+			if !found {
+				break
+			}
 
-		ctx.Writeln(q.Dequeue())
-	case CmdQueueLen:
-		q, found := Queues[cmd.Key]
-		if !found {
-			break
-		}
+			ctx.Writeln(q.Dequeue())
+		case CmdQueueLen:
+			q, found := Queues[cmd.Key]
+			if !found {
+				break
+			}
 
-		ctx.Writeln(fmt.Sprint(q.Length))
-	case CmdPQAdd:
-		var pq *PriorityQueue
-		pq, found := PQueues[cmd.Key]
-		if !found {
-			pq = NewPriorityQueue()
-		}
+			ctx.Writeln(strconv.Itoa(q.Length))
+		case CmdPQAdd:
+			var pq *PriorityQueue
+			pq, found := PQueues[cmd.Key]
+			if !found {
+				pq = NewPriorityQueue()
+			}
 
-		pq.Enqueue(cmd.Value, cmd.Priority)
-		if !found {
-			PQueues[cmd.Key] = pq
-		}
-	case CmdPQPop:
-		pq, found := PQueues[cmd.Key]
-		if !found {
-			break
-		}
+			pq.Enqueue(cmd.Value, cmd.Priority)
+			if !found {
+				PQueues[cmd.Key] = pq
+			}
+		case CmdPQPop:
+			pq, found := PQueues[cmd.Key]
+			if !found {
+				break
+			}
 
-		ctx.Writeln(pq.Dequeue())
-	case CmdPQLen:
-		pq, found := PQueues[cmd.Key]
-		if !found {
-			break
-		}
+			ctx.Writeln(pq.Dequeue())
+		case CmdPQLen:
+			pq, found := PQueues[cmd.Key]
+			if !found {
+				break
+			}
 
-		ctx.Writeln(strconv.Itoa(pq.Length))
+			ctx.Writeln(strconv.Itoa(pq.Length))
+		}
 	}
 }
 
@@ -291,11 +317,10 @@ func (s *Server) handleConnection(conn net.Conn) {
 
 		totalBytes += n
 		payload = append(payload, buffer[:n]...)
-		message := strings.ReplaceAll(string(payload), "\n", "")
 
 		// Only execute when encountering an EOF
 		if err != nil {
-			Execute(NewMemoContext(conn), message)
+			Execute(NewMemoContext(conn, string(payload)))
 			return
 		}
 	}
