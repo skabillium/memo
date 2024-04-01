@@ -1,11 +1,10 @@
 package main
 
 import (
-	"errors"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
-	"strings"
 )
 
 const MemoVersion = "0.0.1"
@@ -58,110 +57,6 @@ type Command struct {
 	Key      string
 	Value    string
 	Priority int
-}
-
-func ParseCommands(message string) ([]Command, error) {
-	message = strings.Trim(message, " \t\n")
-	message = strings.ReplaceAll(message, "\n", " ")
-
-	if message == "" {
-		return nil, errors.New("empty message")
-	}
-
-	split := strings.Split(message, " ")
-	commands := []Command{}
-	i := 0
-	for i < len(split) {
-		cmd := split[i]
-		switch cmd {
-		case "version":
-			commands = append(commands, Command{Kind: CmdVersion})
-		case "ping":
-			commands = append(commands, Command{Kind: CmdPing})
-		case "keys":
-			commands = append(commands, Command{Kind: CmdKeys})
-		case "set":
-			// Needs another 2 arguments
-			if i+2 > len(split) {
-				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-			}
-			commands = append(commands, Command{Kind: CmdSet, Key: split[i+1], Value: split[i+2]})
-			i += 2
-		case "get":
-			if i+1 > len(split) {
-				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-			}
-			commands = append(commands, Command{Kind: CmdGet, Key: split[i+1]})
-			i += 1
-		case "del":
-			if i+1 > len(split) {
-				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-			}
-			commands = append(commands, Command{Kind: CmdDel, Key: split[i+1]})
-			i += 1
-		case "list", "ls":
-			commands = append(commands, Command{Kind: CmdList})
-		case "qadd":
-			if i+2 > len(split) {
-				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-			}
-			commands = append(commands, Command{Kind: CmdQueueAdd, Key: split[i+1], Value: split[i+2]})
-			i += 2
-		case "qpop":
-			if i+1 > len(split) {
-				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-			}
-			commands = append(commands, Command{Kind: CmdQueuePop, Key: split[i+1]})
-			i += 1
-		case "qlen":
-			if i+1 > len(split) {
-				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-			}
-			commands = append(commands, Command{Kind: CmdQueueLen, Key: split[i+1]})
-			i += 1
-		case "pqadd":
-			if i+2 > len(split) {
-				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-			}
-
-			pqadd := Command{Kind: CmdPQAdd, Key: split[i+1], Value: split[i+2], Priority: 1}
-			// TODO: Refactor this
-			if i+3 < len(split) {
-				if priority, err := strconv.Atoi(split[i+3]); err == nil {
-					pqadd.Priority = priority
-					i += 3
-					commands = append(commands, pqadd)
-				} else {
-					commands = append(commands, pqadd)
-					i += 2
-				}
-
-			} else {
-				commands = append(commands, pqadd)
-				i += 2
-			}
-		case "pqpop":
-			if i+1 > len(split) {
-				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-			}
-			commands = append(commands, Command{Kind: CmdPQPop, Key: split[i+1]})
-			i += 1
-		case "pqlen":
-			if i+1 > len(split) {
-				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-			}
-			commands = append(commands, Command{Kind: CmdPQLen, Key: split[i+1]})
-			i += 1
-		default:
-			if cmd == "" {
-				break
-			}
-			return nil, fmt.Errorf("unknown command: '%s'", cmd)
-		}
-		i++
-	}
-
-	return commands, nil
 }
 
 func Execute(ctx *MemoContext) {
@@ -310,7 +205,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 		buffer := make([]byte, 1024)
 		// Read data from the client
 		n, err := conn.Read(buffer)
-		if err != nil && err.Error() != "EOF" {
+		if err != nil && err != io.EOF {
 			fmt.Println("Error while reading data for connection")
 			return
 		}
@@ -319,7 +214,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 		payload = append(payload, buffer[:n]...)
 
 		// Only execute when encountering an EOF
-		if err != nil {
+		if err == io.EOF {
 			Execute(NewMemoContext(conn, string(payload)))
 			return
 		}
