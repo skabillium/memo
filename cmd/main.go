@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"net"
@@ -11,16 +12,37 @@ const MemoVersion = "0.0.1"
 const DefaultPort = "5678"
 
 type MemoContext struct {
-	conn    net.Conn
-	Message string
+	conn net.Conn
+	rw   *bufio.ReadWriter
 }
 
-func NewMemoContext(conn net.Conn, message string) *MemoContext {
-	return &MemoContext{conn: conn, Message: message}
+func NewMemoContext(conn net.Conn) *MemoContext {
+	return &MemoContext{
+		conn: conn,
+		rw:   bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn)),
+	}
 }
 
 func (c *MemoContext) Writeln(message string) {
-	c.conn.Write([]byte(message + " \n"))
+	c.rw.WriteString(message + "\n")
+}
+
+func (c *MemoContext) Readline() (string, error) {
+	return c.rw.ReadString('\n')
+}
+
+func (c *MemoContext) EndWith(message string) {
+	c.Writeln(message)
+	c.End()
+}
+
+func (c *MemoContext) EndWithError(message string) {
+	c.Error(message)
+	c.End()
+}
+
+func (c *MemoContext) End() {
+	c.rw.Flush()
 }
 
 func (c *MemoContext) Error(err string) {
@@ -59,8 +81,8 @@ type Command struct {
 	Priority int
 }
 
-func Execute(ctx *MemoContext) {
-	commands, err := ParseCommands(ctx.Message)
+func Execute(ctx *MemoContext, message string) {
+	commands, err := ParseCommands(message)
 	if err != nil {
 		ctx.Error(err.Error())
 		return
@@ -183,7 +205,6 @@ func (s *Server) Start() error {
 	return nil
 }
 
-// TODO: Maybe keep connection open instead of request-response pattern
 func (s *Server) acceptLoop() {
 	for {
 		conn, err := s.ln.Accept()
@@ -199,25 +220,32 @@ func (s *Server) acceptLoop() {
 func (s *Server) handleConnection(conn net.Conn) {
 	defer conn.Close()
 
-	totalBytes := 0
-	payload := []byte{}
+	// Read initialization message
+	ctx := NewMemoContext(conn)
+	init, err := ctx.Readline()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	if init != "hello 1\n" {
+		ctx.EndWithError("Invalid initialization message")
+		return
+	}
+
 	for {
-		buffer := make([]byte, 1024)
-		// Read data from the client
-		n, err := conn.Read(buffer)
-		if err != nil && err != io.EOF {
-			fmt.Println("Error while reading data for connection")
-			return
+		line, err := ctx.Readline()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+
+			fmt.Println("Error while reading data for connection", err)
+			break
 		}
 
-		totalBytes += n
-		payload = append(payload, buffer[:n]...)
-
-		// Only execute when encountering an EOF
-		if err == io.EOF {
-			Execute(NewMemoContext(conn, string(payload)))
-			return
-		}
+		Execute(ctx, line)
+		ctx.End()
 	}
 
 }
