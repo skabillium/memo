@@ -11,6 +11,9 @@ import (
 const MemoVersion = "0.0.1"
 const DefaultPort = "5678"
 
+const DefaultUser = "memo"
+const DefaultPassword = "password"
+
 type MemoContext struct {
 	conn net.Conn
 	rw   *bufio.ReadWriter
@@ -183,10 +186,19 @@ type Server struct {
 	port   string
 	ln     net.Listener
 	quitCh chan struct{}
+
+	// Auth
+	user     string
+	password string
 }
 
-func NewServer(port string) *Server {
-	return &Server{port: port, quitCh: make(chan struct{})}
+func NewServer(port string, user string, password string) *Server {
+	return &Server{
+		port:     port,
+		quitCh:   make(chan struct{}),
+		user:     user,
+		password: password,
+	}
 }
 
 func (s *Server) Start() error {
@@ -228,7 +240,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 		return
 	}
 
-	if init != "hello 1\n" {
+	if init != fmt.Sprintf("hello 1 %s %s\n", s.user, s.password) {
 		ctx.EndWithError("Invalid initialization message")
 		return
 	}
@@ -251,6 +263,6 @@ func (s *Server) handleConnection(conn net.Conn) {
 }
 
 func main() {
-	server := NewServer(DefaultPort)
+	server := NewServer(DefaultPort, DefaultUser, DefaultPassword)
 	server.Start()
 }
