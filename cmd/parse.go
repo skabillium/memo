@@ -43,7 +43,7 @@ type Command struct {
 
 	Priority    int         // pqadd
 	Auth        AuthOptions // hello
-	RespVersion int         // hello
+	RespVersion string      // hello
 }
 
 func ParseCommands(message string) ([]Command, error) {
@@ -71,13 +71,9 @@ func ParseCommands(message string) ([]Command, error) {
 			if i+1 > len(split) {
 				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
 			}
-			resp, err := strconv.Atoi(split[i+1])
-			if err != nil {
-				return nil, err
-			}
 
 			i++
-			hello := Command{Kind: CmdHello, RespVersion: resp, Auth: AuthOptions{}}
+			hello := Command{Kind: CmdHello, RespVersion: split[i], Auth: AuthOptions{}}
 			if i+1 < len(split) && strings.ToLower(split[i+1]) == "auth" {
 				if i+3 >= len(split) {
 					return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)

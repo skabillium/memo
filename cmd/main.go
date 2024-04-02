@@ -78,12 +78,18 @@ func (s *Server) Execute(ctx *MemoContext, message string) {
 			return
 		}
 
-		if commands[0].Kind != CmdHello {
+		hello := commands[0]
+		if hello.Kind != CmdHello {
 			ctx.Error(errors.New("authentication required"))
 			return
 		}
 
-		if !(commands[0].Auth.User == s.user && commands[0].Auth.Password == s.password) {
+		if hello.RespVersion != CurrentRespVersion {
+			ctx.Error(errors.New("NOPROTO unsupported protocol version"))
+			return
+		}
+
+		if !(hello.Auth.User == s.user && hello.Auth.Password == s.password) {
 			ctx.Error(errors.New("WRONGPASS invalid username-password pair or user is disabled"))
 			return
 		}
@@ -98,91 +104,84 @@ func (s *Server) Execute(ctx *MemoContext, message string) {
 		case CmdPing:
 			ctx.Write("PONG")
 		case CmdHello:
+			// TODO: Write some info about the server
 			ctx.Write("HELLO")
 		case CmdKeys:
-			keys := []MemoString{}
-			for k := range KV {
-				keys = append(keys, MemoString(k))
-			}
-			for q := range Queues {
-				keys = append(keys, MemoString(q))
-			}
-			for q := range PQueues {
-				keys = append(keys, MemoString(q))
-			}
-
+			keys := s.db.Keys()
 			ctx.Write(keys)
 		case CmdSet:
-			Set(cmd.Key, cmd.Value)
+			s.db.Set(cmd.Key, cmd.Value)
 			ctx.Write("OK")
 		case CmdGet:
-			value, found := Get(cmd.Key)
+			store, found := s.db.Get(cmd.Key)
+			if !found {
+				ctx.Write(nil)
+				break
+			}
+
+			ctx.Write(store.Value)
+		case CmdList:
+			ctx.Error(errors.New("ERR unsupported command 'list'"))
+		case CmdDel:
+			s.db.Del(cmd.Key)
+			ctx.Write("OK")
+		case CmdQueueAdd:
+			s.db.Qadd(cmd.Key, cmd.Value)
+			ctx.Write("OK")
+		case CmdQueuePop:
+			value, found, err := s.db.QPop(cmd.Key)
+			if err != nil {
+				ctx.Error(err)
+				break
+			}
+
 			if !found {
 				ctx.Write(nil)
 				break
 			}
 
 			ctx.Write(value)
-		case CmdList:
-			ctx.Error(errors.New("ERR unsupported command 'list'"))
-			// entries := List()
-			// var res string
-			// for i := 0; i < len(entries); i++ {
-			// 	res += fmt.Sprintf("'%s':'%s'\n", entries[i][0], entries[i][1])
-			// }
-			// ctx.Writeln(res)
-		case CmdDel:
-			Delete(cmd.Key)
-		case CmdQueueAdd:
-			var q *Queue
-			q, found := Queues[cmd.Key]
-			if !found {
-				q = NewQueue()
-			}
-
-			q.Enqueue(cmd.Value)
-			if !found {
-				Queues[cmd.Key] = q
-			}
-		case CmdQueuePop:
-			q, found := Queues[cmd.Key]
-			if !found {
-				break
-			}
-
-			ctx.Write(q.Dequeue())
 		case CmdQueueLen:
-			q, found := Queues[cmd.Key]
-			if !found {
+			length, found, err := s.db.Qlen(cmd.Key)
+			if err != nil {
+				ctx.Error(err)
 				break
 			}
 
-			ctx.Write(q.Length)
+			if !found {
+				ctx.Write(nil)
+			}
+
+			ctx.Write(length)
 		case CmdPQAdd:
-			var pq *PriorityQueue
-			pq, found := PQueues[cmd.Key]
-			if !found {
-				pq = NewPriorityQueue()
-			}
-
-			pq.Enqueue(cmd.Value, cmd.Priority)
-			if !found {
-				PQueues[cmd.Key] = pq
-			}
+			s.db.PQAdd(cmd.Key, cmd.Value, cmd.Priority)
+			ctx.Write("OK")
 		case CmdPQPop:
-			pq, found := PQueues[cmd.Key]
-			if !found {
+			value, found, err := s.db.PQPop(cmd.Key)
+			if err != nil {
+				ctx.Error(err)
 				break
 			}
 
-			ctx.Write(pq.Dequeue())
+			if !found {
+				ctx.Write(nil)
+				break
+			}
+
+			ctx.Write(value)
 		case CmdPQLen:
-			pq, found := PQueues[cmd.Key]
-			if !found {
+			length, found, err := s.db.PQLen(cmd.Key)
+			if err != nil {
+				ctx.Error(err)
 				break
 			}
 
-			ctx.Write(pq.Length)
+			if !found {
+				ctx.Write(nil)
+				break
+			}
+
+			ctx.Write(length)
 		}
 	}
 }
@@ -196,12 +195,16 @@ type Server struct {
 	user        string
 	password    string
 	requireAuth bool
+
+	// Db
+	db *Database
 }
 
 func NewServer(port string) *Server {
 	return &Server{
 		port:   port,
 		quitCh: make(chan struct{}),
+		db:     NewDatabase(),
 	}
 }
 
@@ -259,6 +262,11 @@ func (s *Server) handleConnection(conn net.Conn) {
 		ctx.End()
 	}
 
+}
+
+type Person struct {
+	Name string
+	Age  int
 }
 
 func main() {
