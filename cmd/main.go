@@ -8,7 +8,6 @@ import (
 	"io"
 	"net"
 	"strconv"
-	"strings"
 )
 
 const MemoVersion = "0.0.1"
@@ -54,6 +53,7 @@ func (c *MemoContext) Readline() (string, error) {
 	return c.rw.ReadString('\n')
 }
 
+// TODO: Clean these functions up
 func (c *MemoContext) Simple(message string) {
 	c.rw.WriteString(SerializeSimpleStr(message))
 }
@@ -81,11 +81,29 @@ type MemoString string
 var Queues = map[string]*Queue{}
 var PQueues = map[string]*PriorityQueue{}
 
-func Execute(ctx *MemoContext, message string) {
+func (s *Server) Execute(ctx *MemoContext, message string) {
 	commands, err := ParseCommands(message)
 	if err != nil {
 		ctx.Error(err)
 		return
+	}
+
+	if !ctx.hasAuth && s.requireAuth {
+		if len(commands) == 0 {
+			return
+		}
+
+		if commands[0].Kind != CmdHello {
+			ctx.Error(errors.New("authentication required"))
+			return
+		}
+
+		if !(commands[0].Auth.User == s.user && commands[0].Auth.Password == s.password) {
+			ctx.Error(errors.New("WRONGPASS invalid username-password pair or user is disabled"))
+			return
+		}
+
+		ctx.Authenticate()
 	}
 
 	for _, cmd := range commands {
@@ -94,6 +112,8 @@ func Execute(ctx *MemoContext, message string) {
 			ctx.Writeln(MemoVersion)
 		case CmdPing:
 			ctx.Writeln("PONG")
+		case CmdHello:
+			ctx.Write("HELLO")
 		case CmdKeys:
 			keys := []MemoString{}
 			for k := range KV {
@@ -239,18 +259,6 @@ func (s *Server) handleConnection(conn net.Conn) {
 
 	// Read initialization message
 	ctx := NewMemoContext(conn)
-	init, err := ctx.Readline()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	err = s.checkInitLine(init)
-	if err != nil {
-		ctx.EndWithError(err)
-		return
-	}
-
 	for {
 		line, err := ctx.Readline()
 		if err != nil {
@@ -262,43 +270,10 @@ func (s *Server) handleConnection(conn net.Conn) {
 			break
 		}
 
-		Execute(ctx, line)
+		s.Execute(ctx, line)
 		ctx.End()
 	}
 
-}
-
-func (s *Server) checkInitLine(line string) error {
-	split := strings.Split(strings.Trim(line, " \t\r\n"), " ")
-	// TODO: Make hello a command
-
-	if len(split) < 2 {
-		return errors.New("ERR invalid number of arguments")
-	}
-
-	if split[0] != "hello" {
-		return errors.New("ERR invalid command " + split[0])
-	}
-
-	if split[1] != CurrentRespVersion {
-		return errors.New("NOPROTO unsupported protocol version")
-	}
-
-	if s.requireAuth {
-		if len(split) < 5 {
-			return errors.New("ERR invalid number of arguments")
-		}
-
-		if split[2] != "AUTH" {
-			return fmt.Errorf("ERR Syntax error in HELLO option '%s'", split[2])
-		}
-
-		if s.user != split[3] || s.password != split[4] {
-			return errors.New("WRONGPASS invalid username-password pair or user is disabled")
-		}
-	}
-
-	return nil
 }
 
 func main() {

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"unicode"
 )
 
@@ -14,6 +15,7 @@ const (
 	CmdVersion CommandType = iota
 	CmdPing
 	CmdKeys
+	CmdHello
 	// KV
 	CmdSet
 	CmdGet
@@ -29,11 +31,19 @@ const (
 	CmdPQLen
 )
 
+type AuthOptions struct {
+	User     string
+	Password string
+}
+
 type Command struct {
-	Kind     CommandType
-	Key      string
-	Value    string
-	Priority int
+	Kind  CommandType
+	Key   string
+	Value string
+
+	Priority    int         // pqadd
+	Auth        AuthOptions // hello
+	RespVersion int         // hello
 }
 
 func ParseCommands(message string) ([]Command, error) {
@@ -57,6 +67,27 @@ func ParseCommands(message string) ([]Command, error) {
 			commands = append(commands, Command{Kind: CmdPing})
 		case "keys":
 			commands = append(commands, Command{Kind: CmdKeys})
+		case "hello":
+			if i+1 > len(split) {
+				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
+			}
+			resp, err := strconv.Atoi(split[i+1])
+			if err != nil {
+				return nil, err
+			}
+
+			i++
+			hello := Command{Kind: CmdHello, RespVersion: resp, Auth: AuthOptions{}}
+			if i+1 < len(split) && strings.ToLower(split[i+1]) == "auth" {
+				if i+3 >= len(split) {
+					return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
+				}
+
+				hello.Auth.User = split[i+2]
+				hello.Auth.Password = split[i+3]
+				i += 3
+			}
+			commands = append(commands, hello)
 		case "set":
 			// Needs another 2 arguments
 			if i+2 > len(split) {
