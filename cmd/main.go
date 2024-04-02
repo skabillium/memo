@@ -35,7 +35,13 @@ func (c *MemoContext) Writeln(message string) {
 }
 
 func (c *MemoContext) Write(message any) {
-	c.rw.WriteString(Serialize(message))
+	payload, err := Serialize(message)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	c.rw.WriteString(payload)
 }
 
 func (c *MemoContext) Readline() (string, error) {
@@ -63,6 +69,8 @@ func (c *MemoContext) End() {
 func (c *MemoContext) Error(err error) {
 	c.rw.WriteString(SerializeError(err) + "\n")
 }
+
+type MemoString string
 
 type MemoEntry struct {
 	str string

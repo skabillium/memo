@@ -6,43 +6,44 @@ import (
 )
 
 func TestSerialize(t *testing.T) {
-	i := 12
-	if Serialize(i) != ":12\r\n" {
+	if r, err := Serialize(12); r != ":12\r\n" || err != nil {
 		t.Error("Expected other result for Serialize(12)")
 	}
 
-	n := -5
-	if Serialize(n) != ":-5\r\n" {
+	if r, err := Serialize(-5); r != ":-5\r\n" || err != nil {
 		t.Error("Expected other result for Serialize(-5)")
 	}
 
-	str := "hello there!"
-	if Serialize(str) != "+hello there!\r\n" {
+	if r, err := Serialize("hello there!"); r != "+hello there!\r\n" || err != nil {
 		t.Error("Expected other result for Serialize('hello there!')")
 	}
 
-	str = ""
-	if Serialize(str) != "$0\r\n\r\n" {
+	if r, err := Serialize(""); r != "+\r\n" || err != nil {
 		t.Error("Expected other result for Serialize('')")
 	}
 
 	arr := []any{3, "word", -1}
-	if Serialize(arr) != "*3\r\n:3\r\n+word\r\n:-1\r\n" {
+	if r, err := Serialize(arr); r != "*3\r\n:3\r\n+word\r\n:-1\r\n" || err != nil {
 		t.Error("Expected other result for Serialize([3, 'word', -1])")
 	}
 
 	arr = []any{}
-	if Serialize(arr) != "*0\r\n" {
+	if r, err := Serialize(arr); r != "*0\r\n" || err != nil {
 		t.Error("Expected other result for Serialize([])")
 	}
 
 	err := errors.New("custom error")
-	if Serialize(err) != "-custom error\r\n" {
+	if r, err := Serialize(err); r != "-custom error\r\n" || err != nil {
 		t.Error("Expected other result for Serialize(err)")
 	}
 
-	entry := NewMemoEntry("example entry")
-	if Serialize(entry) != "$13\r\nexample entry\r\n" {
-		t.Error("Expected other result for Serialize(MemoEntry)")
+	mstr := MemoString("message")
+	if r, err := Serialize(mstr); r != "$7\r\nmessage\r\n" || err != nil {
+		t.Error("Expected other result for Serialize(MemoString('message'))")
+	}
+
+	mstr = MemoString("")
+	if r, err := Serialize(mstr); r != "$0\r\n\r\n" || err != nil {
+		t.Error("Expected other result for Serialize(MemoString(''))")
 	}
 }

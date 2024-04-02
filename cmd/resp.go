@@ -1,36 +1,45 @@
+// Provide serialization functions for compliance with the REdis Serialization Protocol
+// specification, see: https://redis.io/docs/reference/protocol-spec/#resp-protocol-description
+
 package main
 
 import (
+	"fmt"
 	"reflect"
 	"strconv"
 )
 
-func Serialize(v any) string {
+func Serialize(v any) (string, error) {
 	tp := reflect.TypeOf(v)
 	switch tp.Kind() {
 	case reflect.Int:
-		return SerializeInt(v.(int))
+		return SerializeInt(v.(int)), nil
 	case reflect.String:
-		return SerializeSimpleStr(v.(string))
+		if tp == reflect.TypeOf(MemoString("")) {
+			return SerializeStr(fmt.Sprint(v)), nil
+		}
+
+		return SerializeSimpleStr(v.(string)), nil
 	case reflect.Slice:
 		arr := reflect.ValueOf(v)
 		out := "*" + strconv.Itoa(arr.Len()) + "\r\n"
 		for i := 0; i < arr.Len(); i++ {
 			el := arr.Index(i).Interface()
-			out += Serialize(el)
+			r, err := Serialize(el)
+			if err != nil {
+				return "", err
+			}
+
+			out += r
 		}
-		return out
+		return out, nil
 	default:
 		if err, ok := v.(error); ok {
-			return SerializeError(err)
-		}
-
-		if entry, ok := v.(MemoEntry); ok {
-			return SerializeStr(entry.str)
+			return "-" + err.Error() + "\r\n", nil
 		}
 	}
 
-	return ""
+	return "", fmt.Errorf("value '%s' cannot be serialized", tp)
 }
 
 func SerializeSimpleStr(str string) string {
@@ -50,19 +59,4 @@ func SerializeError(err error) string {
 
 func SerializeInt(n int) string {
 	return ":" + strconv.Itoa(n) + "\r\n"
-}
-
-func SerializeArr(arr []string) string {
-	out := "*"
-	if len(arr) == 0 {
-		out += "0\r"
-		return out
-	}
-
-	out += strconv.Itoa(len(arr)) + "\r\n"
-	for _, s := range arr {
-		out += SerializeSimpleStr(s) + "\n"
-	}
-
-	return out
 }
