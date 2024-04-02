@@ -7,56 +7,33 @@ import (
 	"unicode"
 )
 
-func isWhitespace(b byte) bool {
-	return unicode.IsSpace(rune(b))
-}
+type CommandType = byte
 
-func sanitize(message string) ([]string, error) {
-	out := []string{}
-	i := 0
+const (
+	// Server commands
+	CmdVersion CommandType = iota
+	CmdPing
+	CmdKeys
+	// KV
+	CmdSet
+	CmdGet
+	CmdList
+	CmdDel
+	// Queues
+	CmdQueueAdd
+	CmdQueuePop
+	CmdQueueLen
+	// Priority Queues
+	CmdPQAdd
+	CmdPQPop
+	CmdPQLen
+)
 
-	for i < len(message) {
-		c := message[i]
-		if isWhitespace(c) {
-			i++
-			continue
-		}
-
-		if c == '"' || c == '\'' {
-			term := c
-			i++
-			start := i
-			c := message[i]
-			for i < len(message) && c != term {
-				// TODO: Parse special characters
-				c = message[i]
-				i++
-			}
-
-			if c != term {
-				return nil, errors.New("unterminated string")
-			}
-
-			out = append(out, message[start:i-1])
-			i++
-			continue
-		}
-
-		// TODO: Refactor this
-		start := i
-		for i < len(message) && !isWhitespace(c) {
-			c = message[i]
-			i++
-		}
-
-		if i == len(message) && !isWhitespace(c) {
-			i++
-		}
-
-		out = append(out, message[start:i-1])
-	}
-
-	return out, nil
+type Command struct {
+	Kind     CommandType
+	Key      string
+	Value    string
+	Priority int
 }
 
 func ParseCommands(message string) ([]Command, error) {
@@ -162,4 +139,56 @@ func ParseCommands(message string) ([]Command, error) {
 	}
 
 	return commands, nil
+}
+
+func isWhitespace(b byte) bool {
+	return unicode.IsSpace(rune(b))
+}
+
+func sanitize(message string) ([]string, error) {
+	out := []string{}
+	i := 0
+
+	for i < len(message) {
+		c := message[i]
+		if isWhitespace(c) {
+			i++
+			continue
+		}
+
+		if c == '"' || c == '\'' {
+			term := c
+			i++
+			start := i
+			c := message[i]
+			for i < len(message) && c != term {
+				// TODO: Parse special characters
+				c = message[i]
+				i++
+			}
+
+			if c != term {
+				return nil, errors.New("unterminated string")
+			}
+
+			out = append(out, message[start:i-1])
+			i++
+			continue
+		}
+
+		// TODO: Refactor this
+		start := i
+		for i < len(message) && !isWhitespace(c) {
+			c = message[i]
+			i++
+		}
+
+		if i == len(message) && !isWhitespace(c) {
+			i++
+		}
+
+		out = append(out, message[start:i-1])
+	}
+
+	return out, nil
 }

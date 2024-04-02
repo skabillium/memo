@@ -19,15 +19,21 @@ const DefaultPassword = "password"
 const CurrentRespVersion = "2"
 
 type MemoContext struct {
-	conn net.Conn
-	rw   *bufio.ReadWriter
+	conn    net.Conn
+	rw      *bufio.ReadWriter
+	hasAuth bool
 }
 
 func NewMemoContext(conn net.Conn) *MemoContext {
 	return &MemoContext{
-		conn: conn,
-		rw:   bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn)),
+		conn:    conn,
+		rw:      bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn)),
+		hasAuth: false,
 	}
+}
+
+func (c *MemoContext) Authenticate() {
+	c.hasAuth = true
 }
 
 func (c *MemoContext) Writeln(message string) {
@@ -72,49 +78,8 @@ func (c *MemoContext) Error(err error) {
 
 type MemoString string
 
-type MemoEntry struct {
-	str string
-}
-
-func NewMemoEntry(str string) *MemoEntry {
-	return &MemoEntry{str: str}
-}
-
-func (e *MemoEntry) String() string {
-	return e.str
-}
-
 var Queues = map[string]*Queue{}
 var PQueues = map[string]*PriorityQueue{}
-
-type CommandType = byte
-
-const (
-	// Server commands
-	CmdVersion CommandType = iota
-	CmdPing
-	CmdKeys
-	// KV
-	CmdSet
-	CmdGet
-	CmdList
-	CmdDel
-	// Queues
-	CmdQueueAdd
-	CmdQueuePop
-	CmdQueueLen
-	// Priority Queues
-	CmdPQAdd
-	CmdPQPop
-	CmdPQLen
-)
-
-type Command struct {
-	Kind     CommandType
-	Key      string
-	Value    string
-	Priority int
-}
 
 func Execute(ctx *MemoContext, message string) {
 	commands, err := ParseCommands(message)
@@ -130,21 +95,21 @@ func Execute(ctx *MemoContext, message string) {
 		case CmdPing:
 			ctx.Writeln("PONG")
 		case CmdKeys:
-			keys := []string{}
+			keys := []MemoString{}
 			for k := range KV {
-				keys = append(keys, k)
+				keys = append(keys, MemoString(k))
 			}
 			for q := range Queues {
-				keys = append(keys, q)
+				keys = append(keys, MemoString(q))
 			}
 			for q := range PQueues {
-				keys = append(keys, q)
+				keys = append(keys, MemoString(q))
 			}
 
 			ctx.Write(keys)
 		case CmdSet:
 			Set(cmd.Key, cmd.Value)
-			ctx.Simple("OK")
+			ctx.Write("OK")
 		case CmdGet:
 			value, found := Get(cmd.Key)
 			if !found {
@@ -152,14 +117,15 @@ func Execute(ctx *MemoContext, message string) {
 				break
 			}
 
-			ctx.Writeln(value)
+			ctx.Write(value)
 		case CmdList:
-			entries := List()
-			var res string
-			for i := 0; i < len(entries); i++ {
-				res += fmt.Sprintf("'%s':'%s'\n", entries[i][0], entries[i][1])
-			}
-			ctx.Writeln(res)
+			ctx.Error(errors.New("ERR unsupported command 'list'"))
+			// entries := List()
+			// var res string
+			// for i := 0; i < len(entries); i++ {
+			// 	res += fmt.Sprintf("'%s':'%s'\n", entries[i][0], entries[i][1])
+			// }
+			// ctx.Writeln(res)
 		case CmdDel:
 			Delete(cmd.Key)
 		case CmdQueueAdd:
@@ -222,8 +188,9 @@ type Server struct {
 	quitCh chan struct{}
 
 	// Auth
-	user     string
-	password string
+	user        string
+	password    string
+	requireAuth bool
 }
 
 func NewServer(port string) *Server {
@@ -234,6 +201,7 @@ func NewServer(port string) *Server {
 }
 
 func (s *Server) Auth(user string, password string) {
+	s.requireAuth = true
 	s.user = user
 	s.password = password
 }
@@ -301,14 +269,11 @@ func (s *Server) handleConnection(conn net.Conn) {
 }
 
 func (s *Server) checkInitLine(line string) error {
-	if s.user == "" || s.password == "" {
-		return nil
-	}
+	split := strings.Split(strings.Trim(line, " \t\r\n"), " ")
+	// TODO: Make hello a command
 
-	split := strings.Split(line, " ")
-
-	if len(split) != 4 {
-		return errors.New("ERR wrong number of arguments")
+	if len(split) < 2 {
+		return errors.New("ERR invalid number of arguments")
 	}
 
 	if split[0] != "hello" {
@@ -319,8 +284,18 @@ func (s *Server) checkInitLine(line string) error {
 		return errors.New("NOPROTO unsupported protocol version")
 	}
 
-	if s.user != split[2] || s.password != split[3] {
-		return errors.New("ERR invalid credentials")
+	if s.requireAuth {
+		if len(split) < 5 {
+			return errors.New("ERR invalid number of arguments")
+		}
+
+		if split[2] != "AUTH" {
+			return fmt.Errorf("ERR Syntax error in HELLO option '%s'", split[2])
+		}
+
+		if s.user != split[3] || s.password != split[4] {
+			return errors.New("WRONGPASS invalid username-password pair or user is disabled")
+		}
 	}
 
 	return nil
@@ -328,16 +303,18 @@ func (s *Server) checkInitLine(line string) error {
 
 func main() {
 	var (
-		port       string
-		portSr     string
-		user       string
-		userSr     string
-		password   string
-		passwordSr string
+		port        string
+		portSr      string
+		disableAuth bool
+		user        string
+		userSr      string
+		password    string
+		passwordSr  string
 	)
 
 	flag.StringVar(&port, "port", "", "Port to run server")
 	flag.StringVar(&portSr, "p", "", "Shorthand for port")
+	flag.BoolVar(&disableAuth, "noauth", false, "Disable authentication")
 	flag.StringVar(&user, "user", "", "User for authentication")
 	flag.StringVar(&userSr, "u", "", "Shorthand for user")
 	flag.StringVar(&password, "password", "", "Password for authentication")
@@ -369,6 +346,9 @@ func main() {
 	}
 
 	server := NewServer(DefaultPort)
-	server.Auth(user, password)
+	if !disableAuth {
+		server.Auth(user, password)
+	}
+
 	server.Start()
 }
