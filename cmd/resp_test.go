@@ -6,6 +6,10 @@ import (
 )
 
 func TestSerialize(t *testing.T) {
+	if r, err := Serialize(nil); r != "$-1\r\n" || err != nil {
+		t.Error("Expected other result for Serialize(nil)")
+	}
+
 	if r, err := Serialize(12); r != ":12\r\n" || err != nil {
 		t.Error("Expected other result for Serialize(12)")
 	}

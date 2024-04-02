@@ -10,6 +10,10 @@ import (
 )
 
 func Serialize(v any) (string, error) {
+	if v == nil {
+		return SerializeNil(), nil
+	}
+
 	tp := reflect.TypeOf(v)
 	switch tp.Kind() {
 	case reflect.Int:
@@ -40,6 +44,10 @@ func Serialize(v any) (string, error) {
 	}
 
 	return "", fmt.Errorf("value '%s' cannot be serialized", tp)
+}
+
+func SerializeNil() string {
+	return "$-1\r\n"
 }
 
 func SerializeSimpleStr(str string) string {
