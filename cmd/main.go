@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"strconv"
 )
 
 const MemoVersion = "0.0.1"
@@ -158,7 +157,7 @@ func (s *Server) Execute(ctx *MemoContext, message string) {
 				break
 			}
 
-			ctx.Write(strconv.Itoa(q.Length))
+			ctx.Write(q.Length)
 		case CmdPQAdd:
 			var pq *PriorityQueue
 			pq, found := PQueues[cmd.Key]
@@ -183,7 +182,7 @@ func (s *Server) Execute(ctx *MemoContext, message string) {
 				break
 			}
 
-			ctx.Write(strconv.Itoa(pq.Length))
+			ctx.Write(pq.Length)
 		}
 	}
 }

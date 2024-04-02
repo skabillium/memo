@@ -1,7 +1,7 @@
 package main
 
 type qNode struct {
-	value string
+	value MemoString
 	next  *qNode
 }
 
@@ -16,7 +16,7 @@ func NewQueue() *Queue {
 }
 
 func (q *Queue) Enqueue(item string) {
-	node := &qNode{value: item}
+	node := &qNode{value: MemoString(item)}
 	q.Length++
 	if q.Length == 1 {
 		q.head, q.tail = node, node
@@ -27,7 +27,7 @@ func (q *Queue) Enqueue(item string) {
 	q.tail = node
 }
 
-func (q *Queue) Dequeue() string {
+func (q *Queue) Dequeue() MemoString {
 	if q.Length == 0 {
 		return ""
 	}
@@ -38,7 +38,7 @@ func (q *Queue) Dequeue() string {
 	return head.value
 }
 
-func (q *Queue) Peek() string {
+func (q *Queue) Peek() MemoString {
 	if q.Length == 0 {
 		return ""
 	}
