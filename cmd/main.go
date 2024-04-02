@@ -35,10 +35,6 @@ func (c *MemoContext) Authenticate() {
 	c.hasAuth = true
 }
 
-func (c *MemoContext) Writeln(message string) {
-	c.rw.WriteString(SerializeSimpleStr(message) + "\n")
-}
-
 func (c *MemoContext) Write(message any) {
 	payload, err := Serialize(message)
 	if err != nil {
@@ -53,18 +49,8 @@ func (c *MemoContext) Readline() (string, error) {
 	return c.rw.ReadString('\n')
 }
 
-// TODO: Clean these functions up
-func (c *MemoContext) Simple(message string) {
-	c.rw.WriteString(SerializeSimpleStr(message))
-}
-
-func (c *MemoContext) EndWith(message string) {
-	c.Writeln(message)
-	c.End()
-}
-
-func (c *MemoContext) EndWithError(err error) {
-	c.Error(err)
+func (c *MemoContext) EndWith(message any) {
+	c.Write(message)
 	c.End()
 }
 
@@ -73,7 +59,7 @@ func (c *MemoContext) End() {
 }
 
 func (c *MemoContext) Error(err error) {
-	c.rw.WriteString(SerializeError(err) + "\n")
+	c.Write(err)
 }
 
 type MemoString string
@@ -109,9 +95,9 @@ func (s *Server) Execute(ctx *MemoContext, message string) {
 	for _, cmd := range commands {
 		switch cmd.Kind {
 		case CmdVersion:
-			ctx.Writeln(MemoVersion)
+			ctx.Write(MemoVersion)
 		case CmdPing:
-			ctx.Writeln("PONG")
+			ctx.Write("PONG")
 		case CmdHello:
 			ctx.Write("HELLO")
 		case CmdKeys:
@@ -133,7 +119,7 @@ func (s *Server) Execute(ctx *MemoContext, message string) {
 		case CmdGet:
 			value, found := Get(cmd.Key)
 			if !found {
-				ctx.Writeln("<nil>")
+				ctx.Write(nil)
 				break
 			}
 
@@ -165,14 +151,14 @@ func (s *Server) Execute(ctx *MemoContext, message string) {
 				break
 			}
 
-			ctx.Writeln(q.Dequeue())
+			ctx.Write(q.Dequeue())
 		case CmdQueueLen:
 			q, found := Queues[cmd.Key]
 			if !found {
 				break
 			}
 
-			ctx.Writeln(strconv.Itoa(q.Length))
+			ctx.Write(strconv.Itoa(q.Length))
 		case CmdPQAdd:
 			var pq *PriorityQueue
 			pq, found := PQueues[cmd.Key]
@@ -190,14 +176,14 @@ func (s *Server) Execute(ctx *MemoContext, message string) {
 				break
 			}
 
-			ctx.Writeln(pq.Dequeue())
+			ctx.Write(pq.Dequeue())
 		case CmdPQLen:
 			pq, found := PQueues[cmd.Key]
 			if !found {
 				break
 			}
 
-			ctx.Writeln(strconv.Itoa(pq.Length))
+			ctx.Write(strconv.Itoa(pq.Length))
 		}
 	}
 }
