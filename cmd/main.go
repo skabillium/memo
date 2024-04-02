@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"net"
@@ -63,6 +64,18 @@ func (c *MemoContext) Error(err error) {
 	c.rw.WriteString(SerializeError(err) + "\n")
 }
 
+type MemoEntry struct {
+	str string
+}
+
+func NewMemoEntry(str string) *MemoEntry {
+	return &MemoEntry{str: str}
+}
+
+func (e *MemoEntry) String() string {
+	return e.str
+}
+
 var Queues = map[string]*Queue{}
 var PQueues = map[string]*PriorityQueue{}
 
@@ -107,7 +120,7 @@ func Execute(ctx *MemoContext, message string) {
 		case CmdVersion:
 			ctx.Writeln(MemoVersion)
 		case CmdPing:
-			ctx.Writeln("pong")
+			ctx.Writeln("PONG")
 		case CmdKeys:
 			keys := []string{}
 			for k := range KV {
@@ -306,7 +319,48 @@ func (s *Server) checkInitLine(line string) error {
 }
 
 func main() {
+	var (
+		port       string
+		portSr     string
+		user       string
+		userSr     string
+		password   string
+		passwordSr string
+	)
+
+	flag.StringVar(&port, "port", "", "Port to run server")
+	flag.StringVar(&portSr, "p", "", "Shorthand for port")
+	flag.StringVar(&user, "user", "", "User for authentication")
+	flag.StringVar(&userSr, "u", "", "Shorthand for user")
+	flag.StringVar(&password, "password", "", "Password for authentication")
+	flag.StringVar(&passwordSr, "pwd", "", "Shorthand for password")
+	flag.Parse()
+
+	if port == "" {
+		if portSr != "" {
+			port = portSr
+		} else {
+			port = DefaultPort
+		}
+	}
+
+	if user == "" {
+		if userSr != "" {
+			user = userSr
+		} else {
+			user = DefaultUser
+		}
+	}
+
+	if password == "" {
+		if passwordSr != "" {
+			password = passwordSr
+		} else {
+			password = DefaultPassword
+		}
+	}
+
 	server := NewServer(DefaultPort)
-	server.Auth(DefaultUser, DefaultPassword)
+	server.Auth(user, password)
 	server.Start()
 }

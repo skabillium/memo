@@ -5,17 +5,13 @@ import (
 	"strconv"
 )
 
-/*
-TODO:
-- Find out a way to distinguish simple strings for responses like "OK"
-*/
 func Serialize(v any) string {
 	tp := reflect.TypeOf(v)
 	switch tp.Kind() {
 	case reflect.Int:
 		return SerializeInt(v.(int))
 	case reflect.String:
-		return SerializeStr(v.(string))
+		return SerializeSimpleStr(v.(string))
 	case reflect.Slice:
 		arr := reflect.ValueOf(v)
 		out := "*" + strconv.Itoa(arr.Len()) + "\r\n"
@@ -27,6 +23,10 @@ func Serialize(v any) string {
 	default:
 		if err, ok := v.(error); ok {
 			return SerializeError(err)
+		}
+
+		if entry, ok := v.(MemoEntry); ok {
+			return SerializeStr(entry.str)
 		}
 	}
 

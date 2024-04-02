@@ -17,7 +17,7 @@ func TestSerialize(t *testing.T) {
 	}
 
 	str := "hello there!"
-	if Serialize(str) != "$12\r\nhello there!\r\n" {
+	if Serialize(str) != "+hello there!\r\n" {
 		t.Error("Expected other result for Serialize('hello there!')")
 	}
 
@@ -27,7 +27,7 @@ func TestSerialize(t *testing.T) {
 	}
 
 	arr := []any{3, "word", -1}
-	if Serialize(arr) != "*3\r\n:3\r\n$4\r\nword\r\n:-1\r\n" {
+	if Serialize(arr) != "*3\r\n:3\r\n+word\r\n:-1\r\n" {
 		t.Error("Expected other result for Serialize([3, 'word', -1])")
 	}
 
@@ -39,5 +39,10 @@ func TestSerialize(t *testing.T) {
 	err := errors.New("custom error")
 	if Serialize(err) != "-custom error\r\n" {
 		t.Error("Expected other result for Serialize(err)")
+	}
+
+	entry := NewMemoEntry("example entry")
+	if Serialize(entry) != "$13\r\nexample entry\r\n" {
+		t.Error("Expected other result for Serialize(MemoEntry)")
 	}
 }
