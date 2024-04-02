@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"strings"
 )
 
 const MemoVersion = "0.0.1"
@@ -14,6 +15,7 @@ const DefaultPort = "5678"
 
 const DefaultUser = "memo"
 const DefaultPassword = "password"
+const CurrentRespVersion = "2"
 
 type MemoContext struct {
 	conn net.Conn
@@ -203,13 +205,16 @@ type Server struct {
 	password string
 }
 
-func NewServer(port string, user string, password string) *Server {
+func NewServer(port string) *Server {
 	return &Server{
-		port:     port,
-		quitCh:   make(chan struct{}),
-		user:     user,
-		password: password,
+		port:   port,
+		quitCh: make(chan struct{}),
 	}
+}
+
+func (s *Server) Auth(user string, password string) {
+	s.user = user
+	s.password = password
 }
 
 func (s *Server) Start() error {
@@ -251,10 +256,9 @@ func (s *Server) handleConnection(conn net.Conn) {
 		return
 	}
 
-	// s.checkInitLine(init)
-
-	if init != fmt.Sprintf("hello 1 %s %s\n", s.user, s.password) {
-		ctx.EndWithError(errors.New("invalid initialization message"))
+	err = s.checkInitLine(init)
+	if err != nil {
+		ctx.EndWithError(err)
 		return
 	}
 
@@ -275,9 +279,34 @@ func (s *Server) handleConnection(conn net.Conn) {
 
 }
 
-// func (s *Server) checkInitLine(line string) {}
+func (s *Server) checkInitLine(line string) error {
+	if s.user == "" || s.password == "" {
+		return nil
+	}
+
+	split := strings.Split(line, " ")
+
+	if len(split) != 4 {
+		return errors.New("ERR wrong number of arguments")
+	}
+
+	if split[0] != "hello" {
+		return errors.New("ERR invalid command " + split[0])
+	}
+
+	if split[1] != CurrentRespVersion {
+		return errors.New("NOPROTO unsupported protocol version")
+	}
+
+	if s.user != split[2] || s.password != split[3] {
+		return errors.New("ERR invalid credentials")
+	}
+
+	return nil
+}
 
 func main() {
-	server := NewServer(DefaultPort, DefaultUser, DefaultPassword)
+	server := NewServer(DefaultPort)
+	server.Auth(DefaultUser, DefaultPassword)
 	server.Start()
 }
