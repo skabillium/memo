@@ -51,3 +51,7 @@ func TestSerialize(t *testing.T) {
 		t.Error("Expected other result for Serialize(MemoString(''))")
 	}
 }
+
+func TestSerializeStruct(t *testing.T) {}
+
+func TestSerializeMap(t *testing.T) {}

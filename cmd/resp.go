@@ -24,6 +24,42 @@ func Serialize(v any) (string, error) {
 		}
 
 		return SerializeSimpleStr(v.(string)), nil
+	case reflect.Struct:
+		// TODO: Refactor this
+		stc := reflect.ValueOf(v)
+		out := "%" + fmt.Sprint(stc.NumField()) + "\r\n"
+		for i := 0; i < stc.NumField(); i++ {
+			fieldValue := stc.Field(i)
+			fieldName := tp.Field(i).Name
+
+			out += SerializeStr(fieldName)
+			r, err := Serialize(fieldValue.Interface())
+			if err != nil {
+				return "", err
+			}
+			out += r
+		}
+		return out, nil
+	case reflect.Map:
+		mp := reflect.ValueOf(v)
+		keys := mp.MapKeys()
+
+		out := "%" + fmt.Sprint(mp.Len()) + "\r\n"
+		for _, k := range keys {
+			val := mp.MapIndex(k)
+			r, err := Serialize(k.Interface())
+			if err != nil {
+				return "", err
+			}
+			out += r
+
+			r, err = Serialize(val.Interface())
+			if err != nil {
+				return "", err
+			}
+			out += r
+		}
+		return out, nil
 	case reflect.Slice:
 		arr := reflect.ValueOf(v)
 		out := "*" + strconv.Itoa(arr.Len()) + "\r\n"
