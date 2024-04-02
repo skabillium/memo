@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -27,11 +28,19 @@ func NewMemoContext(conn net.Conn) *MemoContext {
 }
 
 func (c *MemoContext) Writeln(message string) {
-	c.rw.WriteString(message + "\n")
+	c.rw.WriteString(SerializeSimpleStr(message) + "\n")
+}
+
+func (c *MemoContext) Write(message any) {
+	c.rw.WriteString(Serialize(message))
 }
 
 func (c *MemoContext) Readline() (string, error) {
 	return c.rw.ReadString('\n')
+}
+
+func (c *MemoContext) Simple(message string) {
+	c.rw.WriteString(SerializeSimpleStr(message))
 }
 
 func (c *MemoContext) EndWith(message string) {
@@ -39,8 +48,8 @@ func (c *MemoContext) EndWith(message string) {
 	c.End()
 }
 
-func (c *MemoContext) EndWithError(message string) {
-	c.Error(message)
+func (c *MemoContext) EndWithError(err error) {
+	c.Error(err)
 	c.End()
 }
 
@@ -48,8 +57,8 @@ func (c *MemoContext) End() {
 	c.rw.Flush()
 }
 
-func (c *MemoContext) Error(err string) {
-	c.Writeln("[ERROR]: " + err)
+func (c *MemoContext) Error(err error) {
+	c.rw.WriteString(SerializeError(err) + "\n")
 }
 
 var Queues = map[string]*Queue{}
@@ -87,7 +96,7 @@ type Command struct {
 func Execute(ctx *MemoContext, message string) {
 	commands, err := ParseCommands(message)
 	if err != nil {
-		ctx.Error(err.Error())
+		ctx.Error(err)
 		return
 	}
 
@@ -98,19 +107,21 @@ func Execute(ctx *MemoContext, message string) {
 		case CmdPing:
 			ctx.Writeln("pong")
 		case CmdKeys:
-			var res string
+			keys := []string{}
 			for k := range KV {
-				res += k + "\n"
+				keys = append(keys, k)
 			}
 			for q := range Queues {
-				res += q + "\n"
+				keys = append(keys, q)
 			}
 			for q := range PQueues {
-				res += q + "\n"
+				keys = append(keys, q)
 			}
-			ctx.Writeln(res)
+
+			ctx.Write(keys)
 		case CmdSet:
 			Set(cmd.Key, cmd.Value)
+			ctx.Simple("OK")
 		case CmdGet:
 			value, found := Get(cmd.Key)
 			if !found {
@@ -240,8 +251,10 @@ func (s *Server) handleConnection(conn net.Conn) {
 		return
 	}
 
+	// s.checkInitLine(init)
+
 	if init != fmt.Sprintf("hello 1 %s %s\n", s.user, s.password) {
-		ctx.EndWithError("Invalid initialization message")
+		ctx.EndWithError(errors.New("invalid initialization message"))
 		return
 	}
 
@@ -261,6 +274,8 @@ func (s *Server) handleConnection(conn net.Conn) {
 	}
 
 }
+
+// func (s *Server) checkInitLine(line string) {}
 
 func main() {
 	server := NewServer(DefaultPort, DefaultUser, DefaultPassword)
