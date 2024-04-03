@@ -61,7 +61,13 @@ func (c *MemoContext) Error(err error) {
 	c.Write(err)
 }
 
-type MemoString string
+func (c *MemoContext) Simple(message string) {
+	c.rw.WriteString(SerializeSimpleStr(message))
+}
+
+func (c *MemoContext) Ok() {
+	c.Simple("OK")
+}
 
 var Queues = map[string]*Queue{}
 var PQueues = map[string]*PriorityQueue{}
@@ -102,7 +108,7 @@ func (s *Server) Execute(ctx *MemoContext, message string) {
 		case CmdVersion:
 			ctx.Write(MemoVersion)
 		case CmdPing:
-			ctx.Write("PONG")
+			ctx.Simple("PONG")
 		case CmdHello:
 			ctx.Write(s.Info)
 		case CmdKeys:
@@ -110,7 +116,7 @@ func (s *Server) Execute(ctx *MemoContext, message string) {
 			ctx.Write(keys)
 		case CmdSet:
 			s.db.Set(cmd.Key, cmd.Value)
-			ctx.Write("OK")
+			ctx.Ok()
 		case CmdGet:
 			store, found := s.db.Get(cmd.Key)
 			if !found {
@@ -123,10 +129,10 @@ func (s *Server) Execute(ctx *MemoContext, message string) {
 			ctx.Error(errors.New("ERR unsupported command 'list'"))
 		case CmdDel:
 			s.db.Del(cmd.Key)
-			ctx.Write("OK")
+			ctx.Ok()
 		case CmdQueueAdd:
 			s.db.Qadd(cmd.Key, cmd.Value)
-			ctx.Write("OK")
+			ctx.Ok()
 		case CmdQueuePop:
 			value, found, err := s.db.QPop(cmd.Key)
 			if err != nil {
@@ -154,7 +160,7 @@ func (s *Server) Execute(ctx *MemoContext, message string) {
 			ctx.Write(length)
 		case CmdPQAdd:
 			s.db.PQAdd(cmd.Key, cmd.Value, cmd.Priority)
-			ctx.Write("OK")
+			ctx.Ok()
 		case CmdPQPop:
 			value, found, err := s.db.PQPop(cmd.Key)
 			if err != nil {
@@ -186,11 +192,11 @@ func (s *Server) Execute(ctx *MemoContext, message string) {
 }
 
 type ServerInfo struct {
-	Server  MemoString
-	Version MemoString
+	Server  string
+	Version string
 	Proto   int
-	Mode    MemoString
-	Modules []MemoString
+	Mode    string
+	Modules []string
 }
 
 type Server struct {
@@ -213,11 +219,11 @@ func NewServer(port string) *Server {
 		quitCh: make(chan struct{}),
 		db:     NewDatabase(),
 		Info: ServerInfo{
-			Server:  MemoString("memo"),
-			Version: MemoString(MemoVersion),
+			Server:  "memo",
+			Version: MemoVersion,
 			Proto:   2,
-			Mode:    MemoString("standalone"),
-			Modules: []MemoString{},
+			Mode:    "standalone",
+			Modules: []string{},
 		},
 	}
 }

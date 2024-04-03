@@ -18,16 +18,16 @@ func TestSerialize(t *testing.T) {
 		t.Error("Expected other result for Serialize(-5)")
 	}
 
-	if r, err := Serialize("hello there!"); r != "+hello there!\r\n" || err != nil {
+	if r, err := Serialize("hello there!"); r != "$12\r\nhello there!\r\n" || err != nil {
 		t.Error("Expected other result for Serialize('hello there!')")
 	}
 
-	if r, err := Serialize(""); r != "+\r\n" || err != nil {
+	if r, err := Serialize(""); r != "$0\r\n\r\n" || err != nil {
 		t.Error("Expected other result for Serialize('')")
 	}
 
 	arr := []any{3, "word", -1}
-	if r, err := Serialize(arr); r != "*3\r\n:3\r\n+word\r\n:-1\r\n" || err != nil {
+	if r, err := Serialize(arr); r != "*3\r\n:3\r\n$4\r\nword\r\n:-1\r\n" || err != nil {
 		t.Error("Expected other result for Serialize([3, 'word', -1])")
 	}
 
@@ -40,15 +40,15 @@ func TestSerialize(t *testing.T) {
 	if r, err := Serialize(err); r != "-custom error\r\n" || err != nil {
 		t.Error("Expected other result for Serialize(err)")
 	}
+}
 
-	mstr := MemoString("message")
-	if r, err := Serialize(mstr); r != "$7\r\nmessage\r\n" || err != nil {
-		t.Error("Expected other result for Serialize(MemoString('message'))")
+func TestSerializeSimple(t *testing.T) {
+	if SerializeSimpleStr("OK") != "+OK\r\n" {
+		t.Error("Expected other result from SerializeSimpleStr('OK')")
 	}
 
-	mstr = MemoString("")
-	if r, err := Serialize(mstr); r != "$0\r\n\r\n" || err != nil {
-		t.Error("Expected other result for Serialize(MemoString(''))")
+	if SerializeSimpleStr("") != "+\r\n" {
+		t.Error("Expected other result from SerializeSimpleStr('')")
 	}
 }
 
@@ -59,7 +59,7 @@ type Person struct {
 
 func TestSerializeStruct(t *testing.T) {
 	b := Person{Name: "Bill", Age: 22}
-	expected := "%2\r\n$4\r\nName\r\n+Bill\r\n$3\r\nAge\r\n:22\r\n"
+	expected := "%2\r\n$4\r\nName\r\n$4\r\nBill\r\n$3\r\nAge\r\n:22\r\n"
 	if r, err := Serialize(b); r != expected || err != nil {
 		t.Errorf("Expected '%s' and got '%s'", expected, r)
 	}

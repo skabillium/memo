@@ -2,7 +2,7 @@ package main
 
 type pqItem struct {
 	priority int
-	data     MemoString
+	data     string
 }
 
 type PriorityQueue struct {
@@ -15,12 +15,12 @@ func NewPriorityQueue() *PriorityQueue {
 }
 
 func (p *PriorityQueue) Enqueue(data string, priority int) {
-	p.items = append(p.items, pqItem{priority: priority, data: MemoString(data)})
+	p.items = append(p.items, pqItem{priority: priority, data: data})
 	p.heapifyUp(p.Length)
 	p.Length++
 }
 
-func (p *PriorityQueue) Dequeue() MemoString {
+func (p *PriorityQueue) Dequeue() string {
 	if p.Length == 0 {
 		return ""
 	}
@@ -37,7 +37,7 @@ func (p *PriorityQueue) Dequeue() MemoString {
 	return out.data
 }
 
-func (p *PriorityQueue) Peek() MemoString {
+func (p *PriorityQueue) Peek() string {
 	if p.Length == 0 {
 		return ""
 	}

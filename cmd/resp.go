@@ -19,11 +19,7 @@ func Serialize(v any) (string, error) {
 	case reflect.Int:
 		return SerializeInt(v.(int)), nil
 	case reflect.String:
-		if tp == reflect.TypeOf(MemoString("")) {
-			return SerializeStr(fmt.Sprint(v)), nil
-		}
-
-		return SerializeSimpleStr(v.(string)), nil
+		return SerializeStr(v.(string)), nil
 	case reflect.Struct:
 		stc := reflect.ValueOf(v)
 		out := "%" + fmt.Sprint(stc.NumField()) + "\r\n"

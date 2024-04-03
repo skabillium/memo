@@ -12,7 +12,7 @@ const (
 
 type DataStore struct {
 	Kind   DataStoreType
-	Value  MemoString
+	Value  string
 	Queue  *Queue
 	PQueue *PriorityQueue
 }
@@ -25,10 +25,11 @@ func NewDatabase() *Database {
 	return &Database{stores: make(map[string]*DataStore)}
 }
 
-func (d *Database) Keys() []MemoString {
-	keys := []MemoString{}
+func (d *Database) Keys() []string {
+	// TODO: Pre-allocate instead of appending
+	keys := []string{}
 	for k := range d.stores {
-		keys = append(keys, MemoString(k))
+		keys = append(keys, k)
 	}
 
 	return keys
@@ -59,14 +60,14 @@ func (d *Database) Qadd(qname string, value string) {
 	}
 }
 
-func (d *Database) QPop(qname string) (MemoString, bool, error) {
+func (d *Database) QPop(qname string) (string, bool, error) {
 	store, found := d.stores[qname]
 	if !found {
-		return MemoString(""), false, nil
+		return "", false, nil
 	}
 
 	if store.Kind != DsQueue {
-		return MemoString(""), found, errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
+		return "", found, errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
 	}
 
 	return store.Queue.Dequeue(), true, nil
@@ -103,14 +104,14 @@ func (d *Database) PQAdd(qname string, value string, priority int) error {
 	return nil
 }
 
-func (d *Database) PQPop(qname string) (MemoString, bool, error) {
+func (d *Database) PQPop(qname string) (string, bool, error) {
 	store, found := d.stores[qname]
 	if !found {
-		return MemoString(""), found, nil
+		return "", found, nil
 	}
 
 	if store.Kind != DsPQueue {
-		return MemoString(""), found, errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
+		return "", found, errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
 	}
 
 	return store.PQueue.Dequeue(), found, nil
@@ -130,7 +131,7 @@ func (d *Database) PQLen(qname string) (int, bool, error) {
 }
 
 func (d *Database) createValue(value string) *DataStore {
-	return &DataStore{Kind: DsValue, Value: MemoString(value)}
+	return &DataStore{Kind: DsValue, Value: value}
 }
 
 func (d *Database) createQueue() *DataStore {
