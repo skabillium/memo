@@ -17,6 +17,7 @@ const (
 	CmdKeys
 	CmdHello
 	CmdInfo
+	CmdFlushAll
 	// KV
 	CmdSet
 	CmdGet
@@ -70,6 +71,8 @@ func ParseCommands(message string) ([]Command, error) {
 			commands = append(commands, Command{Kind: CmdKeys})
 		case "info":
 			commands = append(commands, Command{Kind: CmdInfo})
+		case "flushall":
+			commands = append(commands, Command{Kind: CmdFlushAll})
 		case "hello":
 			if i+1 > len(split) {
 				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)

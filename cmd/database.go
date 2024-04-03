@@ -25,6 +25,10 @@ func NewDatabase() *Database {
 	return &Database{stores: make(map[string]*DataStore)}
 }
 
+func (d *Database) FlushAll() {
+	d.stores = make(map[string]*DataStore)
+}
+
 func (d *Database) Keys() []string {
 	// TODO: Pre-allocate instead of appending
 	keys := []string{}

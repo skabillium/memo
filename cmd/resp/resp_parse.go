@@ -2,7 +2,6 @@ package resp
 
 import (
 	"bufio"
-	"fmt"
 	"strconv"
 	"strings"
 )
@@ -43,7 +42,7 @@ func Read(r *bufio.Reader) (any, error) {
 		return readSlice(r, line)
 	}
 
-	return nil, fmt.Errorf("cannot parse line '%s'", line)
+	return line, nil
 }
 
 func readString(r *bufio.Reader, line string) (string, error) {

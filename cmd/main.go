@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"reflect"
 	"skabillium/memo/cmd/resp"
 )
 
@@ -113,10 +114,13 @@ func (s *Server) Execute(ctx *MemoContext, message string) {
 		case CmdHello:
 			ctx.Write(s.Info)
 		case CmdInfo:
-			ctx.Write(s.Info)
+			ctx.Write("Memo server version " + MemoVersion)
 		case CmdKeys:
 			keys := s.db.Keys()
 			ctx.Write(keys)
+		case CmdFlushAll:
+			s.db.FlushAll()
+			ctx.Ok()
 		case CmdSet:
 			s.db.Set(cmd.Key, cmd.Value)
 			ctx.Ok()
@@ -270,17 +274,37 @@ func (s *Server) handleConnection(conn net.Conn) {
 
 	ctx := NewMemoContext(conn)
 	for {
-		line, err := ctx.Readline()
+		req, err := resp.Read(ctx.rw.Reader)
 		if err != nil {
-			if err == io.EOF {
-				break
+			if err != io.EOF {
+				fmt.Print(err)
 			}
-
-			fmt.Println("Error while reading data for connection", err)
 			break
 		}
 
-		s.Execute(ctx, line)
+		var exec string
+		if reflect.TypeOf(req) == reflect.TypeOf("") {
+			exec = req.(string)
+		}
+
+		if reflect.TypeOf(req) == reflect.TypeOf([]any{}) {
+			arr := req.([]any)
+			for i, v := range arr {
+				s, ok := v.(string)
+				if !ok {
+					fmt.Println("Could not cast", v, "to string")
+					break
+				}
+
+				if i != 0 {
+					exec += " "
+				}
+
+				exec += s
+			}
+		}
+
+		s.Execute(ctx, exec)
 		ctx.End()
 	}
 
