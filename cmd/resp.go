@@ -25,7 +25,6 @@ func Serialize(v any) (string, error) {
 
 		return SerializeSimpleStr(v.(string)), nil
 	case reflect.Struct:
-		// TODO: Refactor this
 		stc := reflect.ValueOf(v)
 		out := "%" + fmt.Sprint(stc.NumField()) + "\r\n"
 		for i := 0; i < stc.NumField(); i++ {

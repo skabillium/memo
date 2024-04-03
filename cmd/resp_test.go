@@ -52,6 +52,15 @@ func TestSerialize(t *testing.T) {
 	}
 }
 
-func TestSerializeStruct(t *testing.T) {}
+type Person struct {
+	Name string
+	Age  int
+}
 
-func TestSerializeMap(t *testing.T) {}
+func TestSerializeStruct(t *testing.T) {
+	b := Person{Name: "Bill", Age: 22}
+	expected := "%2\r\n$4\r\nName\r\n+Bill\r\n$3\r\nAge\r\n:22\r\n"
+	if r, err := Serialize(b); r != expected || err != nil {
+		t.Errorf("Expected '%s' and got '%s'", expected, r)
+	}
+}

@@ -104,8 +104,7 @@ func (s *Server) Execute(ctx *MemoContext, message string) {
 		case CmdPing:
 			ctx.Write("PONG")
 		case CmdHello:
-			// TODO: Write some info about the server
-			ctx.Write("HELLO")
+			ctx.Write(s.Info)
 		case CmdKeys:
 			keys := s.db.Keys()
 			ctx.Write(keys)
@@ -186,18 +185,26 @@ func (s *Server) Execute(ctx *MemoContext, message string) {
 	}
 }
 
+type ServerInfo struct {
+	Server  MemoString
+	Version MemoString
+	Proto   int
+	Mode    MemoString
+	Modules []MemoString
+}
+
 type Server struct {
 	port   string
 	ln     net.Listener
 	quitCh chan struct{}
-
 	// Auth
 	user        string
 	password    string
 	requireAuth bool
-
 	// Db
 	db *Database
+	// Server info
+	Info ServerInfo
 }
 
 func NewServer(port string) *Server {
@@ -205,6 +212,13 @@ func NewServer(port string) *Server {
 		port:   port,
 		quitCh: make(chan struct{}),
 		db:     NewDatabase(),
+		Info: ServerInfo{
+			Server:  MemoString("memo"),
+			Version: MemoString(MemoVersion),
+			Proto:   2,
+			Mode:    MemoString("standalone"),
+			Modules: []MemoString{},
+		},
 	}
 }
 
@@ -262,11 +276,6 @@ func (s *Server) handleConnection(conn net.Conn) {
 		ctx.End()
 	}
 
-}
-
-type Person struct {
-	Name string
-	Age  int
 }
 
 func main() {
