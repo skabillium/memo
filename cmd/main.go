@@ -111,6 +111,8 @@ func (s *Server) Execute(ctx *MemoContext, message string) {
 			ctx.Simple("PONG")
 		case CmdHello:
 			ctx.Write(s.Info)
+		case CmdInfo:
+			ctx.Write(s.Info)
 		case CmdKeys:
 			keys := s.db.Keys()
 			ctx.Write(keys)
@@ -265,7 +267,6 @@ func (s *Server) acceptLoop() {
 func (s *Server) handleConnection(conn net.Conn) {
 	defer conn.Close()
 
-	// Read initialization message
 	ctx := NewMemoContext(conn)
 	for {
 		line, err := ctx.Readline()
