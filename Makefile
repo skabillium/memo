@@ -8,7 +8,7 @@ test:
 	go test ${CMD}
 
 dev:
-	go run ${CMD}
+	go run ${CMD} --noauth
 
 build:
 	go build -o ${BIN} ${CMD}

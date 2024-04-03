@@ -1,7 +1,6 @@
 // Provide serialization functions for compliance with the REdis Serialization Protocol
 // specification, see: https://redis.io/docs/reference/protocol-spec/#resp-protocol-description
-
-package main
+package resp
 
 import (
 	"fmt"

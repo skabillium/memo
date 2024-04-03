@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"skabillium/memo/cmd/resp"
 )
 
 const MemoVersion = "0.0.1"
@@ -35,7 +36,7 @@ func (c *MemoContext) Authenticate() {
 }
 
 func (c *MemoContext) Write(message any) {
-	payload, err := Serialize(message)
+	payload, err := resp.Serialize(message)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -62,7 +63,7 @@ func (c *MemoContext) Error(err error) {
 }
 
 func (c *MemoContext) Simple(message string) {
-	c.rw.WriteString(SerializeSimpleStr(message))
+	c.rw.WriteString(resp.SerializeSimpleStr(message))
 }
 
 func (c *MemoContext) Ok() {
