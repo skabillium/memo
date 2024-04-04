@@ -35,15 +35,15 @@ func TestParse(t *testing.T) {
 	ping
 	version
 	set name bill
-	pqadd emails em@example.com
-	pqadd emails other@example.com 2
+	qadd emails em@example.com
+	qadd emails other@example.com 2
 	`
 	expected := []Command{
 		{Kind: CmdPing},
 		{Kind: CmdVersion},
 		{Kind: CmdSet, Key: "name", Value: "bill"},
-		{Kind: CmdPQAdd, Key: "emails", Value: "em@example.com", Priority: 1},
-		{Kind: CmdPQAdd, Key: "emails", Value: "other@example.com", Priority: 2},
+		{Kind: CmdQueueAdd, Key: "emails", Value: "em@example.com", Priority: 1},
+		{Kind: CmdQueueAdd, Key: "emails", Value: "other@example.com", Priority: 2},
 	}
 
 	commands, err := ParseCommands(message)

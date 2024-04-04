@@ -23,14 +23,10 @@ const (
 	CmdGet
 	CmdList
 	CmdDel
-	// Queues
+	// Priority Queues
 	CmdQueueAdd
 	CmdQueuePop
 	CmdQueueLen
-	// Priority Queues
-	CmdPQAdd
-	CmdPQPop
-	CmdPQLen
 	// Lists
 	CmdLPush
 	CmdLPop
@@ -121,26 +117,8 @@ func ParseCommands(message string) ([]Command, error) {
 			if i+2 > len(split) {
 				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
 			}
-			commands = append(commands, Command{Kind: CmdQueueAdd, Key: split[i+1], Value: split[i+2]})
-			i += 2
-		case "qpop":
-			if i+1 > len(split) {
-				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-			}
-			commands = append(commands, Command{Kind: CmdQueuePop, Key: split[i+1]})
-			i += 1
-		case "qlen":
-			if i+1 > len(split) {
-				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-			}
-			commands = append(commands, Command{Kind: CmdQueueLen, Key: split[i+1]})
-			i += 1
-		case "pqadd":
-			if i+2 > len(split) {
-				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-			}
 
-			pqadd := Command{Kind: CmdPQAdd, Key: split[i+1], Value: split[i+2], Priority: 1}
+			pqadd := Command{Kind: CmdQueueAdd, Key: split[i+1], Value: split[i+2], Priority: 1}
 			// TODO: Refactor this
 			if i+3 < len(split) {
 				if priority, err := strconv.Atoi(split[i+3]); err == nil {
@@ -156,17 +134,17 @@ func ParseCommands(message string) ([]Command, error) {
 				commands = append(commands, pqadd)
 				i += 2
 			}
-		case "pqpop":
+		case "qpop":
 			if i+1 > len(split) {
 				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
 			}
-			commands = append(commands, Command{Kind: CmdPQPop, Key: split[i+1]})
+			commands = append(commands, Command{Kind: CmdQueuePop, Key: split[i+1]})
 			i += 1
-		case "pqlen":
+		case "qlen":
 			if i+1 > len(split) {
 				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
 			}
-			commands = append(commands, Command{Kind: CmdPQLen, Key: split[i+1]})
+			commands = append(commands, Command{Kind: CmdQueueLen, Key: split[i+1]})
 			i += 1
 		case "lpush":
 			if i+2 > len(split) {

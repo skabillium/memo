@@ -47,58 +47,6 @@ func (d *Database) Del(key string) {
 	delete(d.objs, key)
 }
 
-func (d *Database) Qadd(qname string, value string) error {
-	obj, found := d.objs[qname]
-	if !found {
-		obj = d.newQueueObj()
-	}
-
-	queue, ok := obj.asQueue()
-	if !ok {
-		return ErrWrongType
-	}
-
-	queue.Enqueue(value)
-	if !found {
-		d.objs[qname] = obj
-	}
-
-	return nil
-}
-
-func (d *Database) QPop(qname string) (string, bool, error) {
-	obj, found := d.objs[qname]
-	if !found {
-		return "", false, nil
-	}
-
-	queue, ok := obj.asQueue()
-	if !ok {
-		return "", found, ErrWrongType
-	}
-
-	value := queue.Dequeue()
-	if queue.Length == 0 {
-		d.Del(qname)
-	}
-
-	return value, true, nil
-}
-
-func (d *Database) Qlen(qname string) (int, bool, error) {
-	obj, found := d.objs[qname]
-	if !found {
-		return -1, found, nil
-	}
-
-	queue, ok := obj.asQueue()
-	if !ok {
-		return -1, found, ErrWrongType
-	}
-
-	return queue.Length, found, nil
-}
-
 func (d *Database) PQAdd(qname string, value string, priority int) error {
 	obj, found := d.objs[qname]
 	if !found {

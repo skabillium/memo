@@ -141,37 +141,9 @@ func (s *Server) Execute(ctx *MemoContext, message string) {
 			s.db.Del(cmd.Key)
 			ctx.Ok()
 		case CmdQueueAdd:
-			s.db.Qadd(cmd.Key, cmd.Value)
-			ctx.Ok()
-		case CmdQueuePop:
-			value, found, err := s.db.QPop(cmd.Key)
-			if err != nil {
-				ctx.Error(err)
-				break
-			}
-
-			if !found {
-				ctx.Write(nil)
-				break
-			}
-
-			ctx.Write(value)
-		case CmdQueueLen:
-			length, found, err := s.db.Qlen(cmd.Key)
-			if err != nil {
-				ctx.Error(err)
-				break
-			}
-
-			if !found {
-				ctx.Write(nil)
-			}
-
-			ctx.Write(length)
-		case CmdPQAdd:
 			s.db.PQAdd(cmd.Key, cmd.Value, cmd.Priority)
 			ctx.Ok()
-		case CmdPQPop:
+		case CmdQueuePop:
 			value, found, err := s.db.PQPop(cmd.Key)
 			if err != nil {
 				ctx.Error(err)
@@ -184,7 +156,7 @@ func (s *Server) Execute(ctx *MemoContext, message string) {
 			}
 
 			ctx.Write(value)
-		case CmdPQLen:
+		case CmdQueueLen:
 			length, found, err := s.db.PQLen(cmd.Key)
 			if err != nil {
 				ctx.Error(err)
