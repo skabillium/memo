@@ -2,176 +2,206 @@ package db
 
 import "errors"
 
-type MemoObjType = byte
-
-const (
-	ObjValue MemoObjType = iota
-	ObjQueue
-	ObjPQueue
-	ObjList
-)
-
-type DataStore struct {
-	Kind   MemoObjType
-	Value  string
-	Queue  *Queue
-	PQueue *PriorityQueue
-	List   *List
-}
+var ErrWrongType = errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
 
 type Database struct {
-	stores map[string]*DataStore
+	objs map[string]*MemoObj
 }
 
 func NewDatabase() *Database {
-	return &Database{stores: make(map[string]*DataStore)}
+	return &Database{objs: make(map[string]*MemoObj)}
 }
 
 func (d *Database) FlushAll() {
-	d.stores = make(map[string]*DataStore)
+	d.objs = make(map[string]*MemoObj)
 }
 
 func (d *Database) Keys() []string {
-	// TODO: Pre-allocate instead of appending
-	keys := []string{}
-	for k := range d.stores {
+	keys := make([]string, len(d.objs))
+	for k := range d.objs {
 		keys = append(keys, k)
 	}
 
 	return keys
 }
 
-func (d *Database) Get(key string) (*DataStore, bool) {
-	store, found := d.stores[key]
-	return store, found
+func (d *Database) Get(key string) (string, bool, error) {
+	obj, found := d.objs[key]
+	if !found {
+		return "", found, nil
+	}
+
+	value, ok := obj.asValue()
+	if !ok {
+		return "", found, ErrWrongType
+	}
+
+	return value, found, nil
 }
 
 func (d *Database) Set(key string, value string) {
-	d.stores[key] = d.createValue(value)
+	d.objs[key] = d.newValueObj(value)
 }
 
 func (d *Database) Del(key string) {
-	delete(d.stores, key)
+	delete(d.objs, key)
 }
 
-func (d *Database) Qadd(qname string, value string) {
-	store, found := d.stores[qname]
+func (d *Database) Qadd(qname string, value string) error {
+	obj, found := d.objs[qname]
 	if !found {
-		store = d.createQueue()
+		obj = d.newQueueObj()
 	}
 
-	store.Queue.Enqueue(value)
-	if !found {
-		d.stores[qname] = store
+	queue, ok := obj.asQueue()
+	if !ok {
+		return ErrWrongType
 	}
+
+	queue.Enqueue(value)
+	if !found {
+		d.objs[qname] = obj
+	}
+
+	return nil
 }
 
 func (d *Database) QPop(qname string) (string, bool, error) {
-	store, found := d.stores[qname]
+	obj, found := d.objs[qname]
 	if !found {
 		return "", false, nil
 	}
 
-	if store.Kind != ObjQueue {
-		return "", found, errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
+	queue, ok := obj.asQueue()
+	if !ok {
+		return "", found, ErrWrongType
 	}
 
-	return store.Queue.Dequeue(), true, nil
+	value := queue.Dequeue()
+	if queue.Length == 0 {
+		d.Del(qname)
+	}
+
+	return value, true, nil
 }
 
 func (d *Database) Qlen(qname string) (int, bool, error) {
-	store, found := d.stores[qname]
+	obj, found := d.objs[qname]
 	if !found {
 		return -1, found, nil
 	}
 
-	if store.Kind != ObjQueue {
-		return -1, found, errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
+	queue, ok := obj.asQueue()
+	if !ok {
+		return -1, found, ErrWrongType
 	}
 
-	return store.Queue.Length, found, nil
+	return queue.Length, found, nil
 }
 
 func (d *Database) PQAdd(qname string, value string, priority int) error {
-	store, found := d.stores[qname]
+	obj, found := d.objs[qname]
 	if !found {
-		store = d.createPQueue()
+		obj = d.newPQueueObj()
 	}
 
-	if store.Kind != ObjPQueue {
-		return errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
+	pqueue, ok := obj.asPQueue()
+	if !ok {
+		return ErrWrongType
 	}
 
-	store.PQueue.Enqueue(value, priority)
+	pqueue.Enqueue(value, priority)
 	if !found {
-		d.stores[qname] = store
+		d.objs[qname] = obj
 	}
 
 	return nil
 }
 
 func (d *Database) PQPop(qname string) (string, bool, error) {
-	store, found := d.stores[qname]
+	obj, found := d.objs[qname]
 	if !found {
 		return "", found, nil
 	}
 
-	if store.Kind != ObjPQueue {
-		return "", found, errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
+	pqueue, ok := obj.asPQueue()
+	if !ok {
+		return "", found, ErrWrongType
 	}
 
-	return store.PQueue.Dequeue(), found, nil
+	value := pqueue.Dequeue()
+	if pqueue.Length == 0 {
+		d.Del(qname)
+	}
+
+	return value, found, nil
 }
 
 func (d *Database) PQLen(qname string) (int, bool, error) {
-	store, found := d.stores[qname]
+	obj, found := d.objs[qname]
 	if !found {
 		return -1, found, nil
 	}
 
-	if store.Kind != ObjPQueue {
-		return -1, found, errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
+	pqueue, ok := obj.asPQueue()
+	if !ok {
+		return -1, found, ErrWrongType
 	}
 
-	return store.PQueue.Length, found, nil
+	return pqueue.Length, found, nil
 }
 
-func (d *Database) LPush(lname string, value string) {
-	store, found := d.stores[lname]
+func (d *Database) LPush(lname string, value string) error {
+	obj, found := d.objs[lname]
 	if !found {
-		store = d.createList()
+		obj = d.newListObj()
 	}
 
-	store.List.Prepend(value)
-	if !found {
-		d.stores[lname] = store
+	list, ok := obj.asList()
+	if !ok {
+		return ErrWrongType
 	}
+
+	list.Prepend(value)
+	if !found {
+		d.objs[lname] = obj
+	}
+
+	return nil
 }
 
-func (d *Database) RPush(lname string, value string) {
-	store, found := d.stores[lname]
+func (d *Database) RPush(lname string, value string) error {
+	obj, found := d.objs[lname]
 	if !found {
-		store = d.createList()
+		obj = d.newListObj()
 	}
 
-	store.List.Append(value)
-	if !found {
-		d.stores[lname] = store
+	list, ok := obj.asList()
+	if !ok {
+		return ErrWrongType
 	}
+
+	list.Append(value)
+	if !found {
+		d.objs[lname] = obj
+	}
+
+	return nil
 }
 
 func (d *Database) LPop(lname string) (string, bool, error) {
-	store, found := d.stores[lname]
+	obj, found := d.objs[lname]
 	if !found {
 		return "", found, nil
 	}
 
-	if store.Kind != ObjList {
-		return "", found, errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
+	list, ok := obj.asList()
+	if !ok {
+		return "", found, ErrWrongType
 	}
 
-	value := store.List.PopHead()
-	if store.List.Length == 0 {
+	value := list.PopHead()
+	if list.Length == 0 {
 		d.Del(lname)
 	}
 
@@ -179,17 +209,18 @@ func (d *Database) LPop(lname string) (string, bool, error) {
 }
 
 func (d *Database) RPop(lname string) (string, bool, error) {
-	store, found := d.stores[lname]
+	obj, found := d.objs[lname]
 	if !found {
 		return "", found, nil
 	}
 
-	if store.Kind != ObjList {
-		return "", found, errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
+	list, ok := obj.asList()
+	if !ok {
+		return "", found, ErrWrongType
 	}
 
-	value := store.List.PopTail()
-	if store.List.Length == 0 {
+	value := list.PopTail()
+	if obj.List.Length == 0 {
 		d.Del(lname)
 	}
 
@@ -197,30 +228,15 @@ func (d *Database) RPop(lname string) (string, bool, error) {
 }
 
 func (d *Database) LLen(lname string) (int, error) {
-	store, found := d.stores[lname]
+	obj, found := d.objs[lname]
 	if !found {
 		return -1, nil
 	}
 
-	if store.Kind != ObjList {
-		return -1, errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
+	list, ok := obj.asList()
+	if !ok {
+		return -1, ErrWrongType
 	}
 
-	return store.List.Length, nil
-}
-
-func (d *Database) createValue(value string) *DataStore {
-	return &DataStore{Kind: ObjValue, Value: value}
-}
-
-func (d *Database) createQueue() *DataStore {
-	return &DataStore{Kind: ObjQueue, Queue: NewQueue()}
-}
-
-func (d *Database) createPQueue() *DataStore {
-	return &DataStore{Kind: ObjPQueue, PQueue: NewPriorityQueue()}
-}
-
-func (d *Database) createList() *DataStore {
-	return &DataStore{Kind: ObjList, List: NewList()}
+	return list.Length, nil
 }

@@ -123,13 +123,18 @@ func (s *Server) Execute(ctx *MemoContext, message string) {
 			s.db.Set(cmd.Key, cmd.Value)
 			ctx.Ok()
 		case CmdGet:
-			store, found := s.db.Get(cmd.Key)
+			value, found, err := s.db.Get(cmd.Key)
+			if err != nil {
+				ctx.Error(err)
+				break
+			}
+
 			if !found {
 				ctx.Write(nil)
 				break
 			}
 
-			ctx.Write(store.Value)
+			ctx.Write(value)
 		case CmdList:
 			ctx.Error(errors.New("ERR unsupported command 'list'"))
 		case CmdDel:
@@ -358,7 +363,14 @@ func (s *Server) handleConnection(conn net.Conn) {
 	}
 }
 
-func main() {
+type ServerOptions struct {
+	Port        string
+	DisableAuth bool
+	User        string
+	Password    string
+}
+
+func getServerOptions() *ServerOptions {
 	var (
 		port        string
 		portSr      string
@@ -402,9 +414,21 @@ func main() {
 		}
 	}
 
-	server := NewServer(DefaultPort)
-	if !disableAuth {
-		server.Auth(user, password)
+	options := &ServerOptions{
+		Port:        port,
+		DisableAuth: disableAuth,
+		User:        user,
+		Password:    password,
+	}
+
+	return options
+}
+
+func main() {
+	options := getServerOptions()
+	server := NewServer(options.Port)
+	if !options.DisableAuth {
+		server.Auth(options.User, options.Password)
 	}
 
 	server.Start()
