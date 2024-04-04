@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"reflect"
 	"skabillium/memo/cmd/resp"
 )
 
@@ -70,9 +69,6 @@ func (c *MemoContext) Simple(message string) {
 func (c *MemoContext) Ok() {
 	c.Simple("OK")
 }
-
-var Queues = map[string]*Queue{}
-var PQueues = map[string]*PriorityQueue{}
 
 func (s *Server) Execute(ctx *MemoContext, message string) {
 	commands, err := ParseCommands(message)
@@ -194,6 +190,41 @@ func (s *Server) Execute(ctx *MemoContext, message string) {
 			}
 
 			ctx.Write(length)
+		case CmdLPush:
+			s.db.LPush(cmd.Key, cmd.Value)
+			ctx.Write(1)
+		case CmdRPush:
+			s.db.RPush(cmd.Key, cmd.Value)
+			ctx.Write(1)
+		case CmdLPop:
+			value, found, err := s.db.LPop(cmd.Key)
+			if err != nil {
+				ctx.Error(err)
+				break
+			}
+			if !found {
+				ctx.Write(nil)
+				break
+			}
+			ctx.Write(value)
+		case CmdRPop:
+			value, found, err := s.db.RPop(cmd.Key)
+			if err != nil {
+				ctx.Error(err)
+				break
+			}
+			if !found {
+				ctx.Write(nil)
+				break
+			}
+			ctx.Write(value)
+		case CmdLLen:
+			length, err := s.db.LLen(cmd.Key)
+			if err != nil {
+				ctx.Error(err)
+				break
+			}
+			ctx.Write(length)
 		}
 	}
 }
@@ -283,25 +314,23 @@ func (s *Server) handleConnection(conn net.Conn) {
 		}
 
 		var exec string
-		if reflect.TypeOf(req) == reflect.TypeOf("") {
-			exec = req.(string)
-		}
-
-		if reflect.TypeOf(req) == reflect.TypeOf([]any{}) {
-			arr := req.([]any)
-			for i, v := range arr {
+		switch req := req.(type) {
+		case string:
+			exec = req
+		case []any:
+			for i, v := range req {
 				s, ok := v.(string)
 				if !ok {
 					fmt.Println("Could not cast", v, "to string")
 					break
 				}
-
 				if i != 0 {
 					exec += " "
 				}
-
 				exec += s
 			}
+		default:
+			ctx.Error(errors.New("unsupported type for request"))
 		}
 
 		s.Execute(ctx, exec)

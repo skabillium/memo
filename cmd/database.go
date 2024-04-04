@@ -8,6 +8,7 @@ const (
 	DsValue DataStoreType = iota
 	DsQueue
 	DsPQueue
+	DsList
 )
 
 type DataStore struct {
@@ -15,6 +16,7 @@ type DataStore struct {
 	Value  string
 	Queue  *Queue
 	PQueue *PriorityQueue
+	List   *List
 }
 
 type Database struct {
@@ -134,6 +136,79 @@ func (d *Database) PQLen(qname string) (int, bool, error) {
 	return store.PQueue.Length, found, nil
 }
 
+func (d *Database) LPush(lname string, value string) {
+	store, found := d.stores[lname]
+	if !found {
+		store = d.createList()
+	}
+
+	store.List.Prepend(value)
+	if !found {
+		d.stores[lname] = store
+	}
+}
+
+func (d *Database) RPush(lname string, value string) {
+	store, found := d.stores[lname]
+	if !found {
+		store = d.createList()
+	}
+
+	store.List.Append(value)
+	if !found {
+		d.stores[lname] = store
+	}
+}
+
+func (d *Database) LPop(lname string) (string, bool, error) {
+	store, found := d.stores[lname]
+	if !found {
+		return "", found, nil
+	}
+
+	if store.Kind != DsList {
+		return "", found, errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	value := store.List.PopHead()
+	if store.List.Length == 0 {
+		d.Del(lname)
+	}
+
+	return value, found, nil
+}
+
+func (d *Database) RPop(lname string) (string, bool, error) {
+	store, found := d.stores[lname]
+	if !found {
+		return "", found, nil
+	}
+
+	if store.Kind != DsList {
+		return "", found, errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	value := store.List.PopTail()
+	if store.List.Length == 0 {
+		d.Del(lname)
+	}
+
+	return value, found, nil
+}
+
+func (d *Database) LLen(lname string) (int, error) {
+	store, found := d.stores[lname]
+	if !found {
+		return -1, nil
+	}
+
+	if store.Kind != DsList {
+		return -1, errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	return store.List.Length, nil
+}
+
 func (d *Database) createValue(value string) *DataStore {
 	return &DataStore{Kind: DsValue, Value: value}
 }
@@ -144,4 +219,8 @@ func (d *Database) createQueue() *DataStore {
 
 func (d *Database) createPQueue() *DataStore {
 	return &DataStore{Kind: DsPQueue, PQueue: NewPriorityQueue()}
+}
+
+func (d *Database) createList() *DataStore {
+	return &DataStore{Kind: DsList, List: NewList()}
 }

@@ -31,6 +31,12 @@ const (
 	CmdPQAdd
 	CmdPQPop
 	CmdPQLen
+	// Lists
+	CmdLPush
+	CmdLPop
+	CmdRPush
+	CmdRPop
+	CmdLLen
 )
 
 type AuthOptions struct {
@@ -161,6 +167,36 @@ func ParseCommands(message string) ([]Command, error) {
 				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
 			}
 			commands = append(commands, Command{Kind: CmdPQLen, Key: split[i+1]})
+			i += 1
+		case "lpush":
+			if i+2 > len(split) {
+				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
+			}
+			commands = append(commands, Command{Kind: CmdLPush, Key: split[i+1], Value: split[i+2]})
+			i += 2
+		case "lpop":
+			if i+1 > len(split) {
+				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
+			}
+			commands = append(commands, Command{Kind: CmdLPop, Key: split[i+1]})
+			i += 1
+		case "rpush":
+			if i+2 > len(split) {
+				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
+			}
+			commands = append(commands, Command{Kind: CmdRPush, Key: split[i+1], Value: split[i+2]})
+			i += 2
+		case "rpop":
+			if i+1 > len(split) {
+				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
+			}
+			commands = append(commands, Command{Kind: CmdRPop, Key: split[i+1]})
+			i += 1
+		case "llen":
+			if i+1 > len(split) {
+				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
+			}
+			commands = append(commands, Command{Kind: CmdLLen, Key: split[i+1]})
 			i += 1
 		default:
 			if cmd == "" {
