@@ -73,6 +73,7 @@ func Serialize(v any) (string, error) {
 		}
 	}
 
+	// TODO: Maybe skip if it cannot be serialized
 	return "", fmt.Errorf("value '%s' cannot be serialized", tp)
 }
 

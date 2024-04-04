@@ -9,6 +9,7 @@ import (
 	"net"
 	"skabillium/memo/cmd/db"
 	"skabillium/memo/cmd/resp"
+	"sync"
 )
 
 const MemoVersion = "0.0.1"
@@ -231,11 +232,12 @@ func (s *Server) Execute(ctx *MemoContext, message string) {
 }
 
 type ServerInfo struct {
-	Server  string
-	Version string
-	Proto   int
-	Mode    string
-	Modules []string
+	Server      string
+	Version     string
+	Proto       int
+	Mode        string
+	Modules     []string
+	Connections int
 }
 
 type Server struct {
@@ -249,7 +251,8 @@ type Server struct {
 	// Db
 	db *db.Database
 	// Server info
-	Info ServerInfo
+	connMu sync.Mutex // Mutex to increment connections
+	Info   ServerInfo
 }
 
 func NewServer(port string) *Server {
@@ -258,11 +261,12 @@ func NewServer(port string) *Server {
 		quitCh: make(chan struct{}),
 		db:     db.NewDatabase(),
 		Info: ServerInfo{
-			Server:  "memo",
-			Version: MemoVersion,
-			Proto:   2,
-			Mode:    "standalone",
-			Modules: []string{},
+			Server:      "memo",
+			Version:     MemoVersion,
+			Proto:       2,
+			Mode:        "standalone",
+			Modules:     []string{},
+			Connections: 0,
 		},
 	}
 }
@@ -271,6 +275,20 @@ func (s *Server) Auth(user string, password string) {
 	s.requireAuth = true
 	s.user = user
 	s.password = password
+}
+
+func (s *Server) newConn() {
+	s.connMu.Lock()
+	defer s.connMu.Unlock()
+	s.Info.Connections++
+}
+
+func (s *Server) closeConn(conn net.Conn) {
+	conn.Close()
+
+	s.connMu.Lock()
+	defer s.connMu.Unlock()
+	s.Info.Connections--
 }
 
 func (s *Server) Start() error {
@@ -297,12 +315,13 @@ func (s *Server) acceptLoop() {
 			continue
 		}
 
+		s.newConn()
 		go s.handleConnection(conn)
 	}
 }
 
 func (s *Server) handleConnection(conn net.Conn) {
-	defer conn.Close()
+	defer s.closeConn(conn)
 
 	ctx := NewMemoContext(conn)
 	for {
@@ -337,7 +356,6 @@ func (s *Server) handleConnection(conn net.Conn) {
 		s.Execute(ctx, exec)
 		ctx.End()
 	}
-
 }
 
 func main() {
