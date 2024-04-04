@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"skabillium/memo/cmd/db"
 	"skabillium/memo/cmd/resp"
 )
 
@@ -246,7 +247,7 @@ type Server struct {
 	password    string
 	requireAuth bool
 	// Db
-	db *Database
+	db *db.Database
 	// Server info
 	Info ServerInfo
 }
@@ -255,7 +256,7 @@ func NewServer(port string) *Server {
 	return &Server{
 		port:   port,
 		quitCh: make(chan struct{}),
-		db:     NewDatabase(),
+		db:     db.NewDatabase(),
 		Info: ServerInfo{
 			Server:  "memo",
 			Version: MemoVersion,

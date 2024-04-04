@@ -1,4 +1,4 @@
-package main
+package db
 
 type qNode struct {
 	value string

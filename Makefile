@@ -5,6 +5,7 @@ clean:
 	rm -rf ./bin
 
 test:
+	go test ${CMD}/db
 	go test ${CMD}/resp
 	go test ${CMD}
 

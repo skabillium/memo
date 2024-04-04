@@ -1,18 +1,18 @@
-package main
+package db
 
 import "errors"
 
-type DataStoreType = byte
+type MemoObjType = byte
 
 const (
-	DsValue DataStoreType = iota
-	DsQueue
-	DsPQueue
-	DsList
+	ObjValue MemoObjType = iota
+	ObjQueue
+	ObjPQueue
+	ObjList
 )
 
 type DataStore struct {
-	Kind   DataStoreType
+	Kind   MemoObjType
 	Value  string
 	Queue  *Queue
 	PQueue *PriorityQueue
@@ -72,7 +72,7 @@ func (d *Database) QPop(qname string) (string, bool, error) {
 		return "", false, nil
 	}
 
-	if store.Kind != DsQueue {
+	if store.Kind != ObjQueue {
 		return "", found, errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
 	}
 
@@ -85,7 +85,7 @@ func (d *Database) Qlen(qname string) (int, bool, error) {
 		return -1, found, nil
 	}
 
-	if store.Kind != DsQueue {
+	if store.Kind != ObjQueue {
 		return -1, found, errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
 	}
 
@@ -98,7 +98,7 @@ func (d *Database) PQAdd(qname string, value string, priority int) error {
 		store = d.createPQueue()
 	}
 
-	if store.Kind != DsPQueue {
+	if store.Kind != ObjPQueue {
 		return errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
 	}
 
@@ -116,7 +116,7 @@ func (d *Database) PQPop(qname string) (string, bool, error) {
 		return "", found, nil
 	}
 
-	if store.Kind != DsPQueue {
+	if store.Kind != ObjPQueue {
 		return "", found, errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
 	}
 
@@ -129,7 +129,7 @@ func (d *Database) PQLen(qname string) (int, bool, error) {
 		return -1, found, nil
 	}
 
-	if store.Kind != DsPQueue {
+	if store.Kind != ObjPQueue {
 		return -1, found, errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
 	}
 
@@ -166,7 +166,7 @@ func (d *Database) LPop(lname string) (string, bool, error) {
 		return "", found, nil
 	}
 
-	if store.Kind != DsList {
+	if store.Kind != ObjList {
 		return "", found, errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
 	}
 
@@ -184,7 +184,7 @@ func (d *Database) RPop(lname string) (string, bool, error) {
 		return "", found, nil
 	}
 
-	if store.Kind != DsList {
+	if store.Kind != ObjList {
 		return "", found, errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
 	}
 
@@ -202,7 +202,7 @@ func (d *Database) LLen(lname string) (int, error) {
 		return -1, nil
 	}
 
-	if store.Kind != DsList {
+	if store.Kind != ObjList {
 		return -1, errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
 	}
 
@@ -210,17 +210,17 @@ func (d *Database) LLen(lname string) (int, error) {
 }
 
 func (d *Database) createValue(value string) *DataStore {
-	return &DataStore{Kind: DsValue, Value: value}
+	return &DataStore{Kind: ObjValue, Value: value}
 }
 
 func (d *Database) createQueue() *DataStore {
-	return &DataStore{Kind: DsQueue, Queue: NewQueue()}
+	return &DataStore{Kind: ObjQueue, Queue: NewQueue()}
 }
 
 func (d *Database) createPQueue() *DataStore {
-	return &DataStore{Kind: DsPQueue, PQueue: NewPriorityQueue()}
+	return &DataStore{Kind: ObjPQueue, PQueue: NewPriorityQueue()}
 }
 
 func (d *Database) createList() *DataStore {
-	return &DataStore{Kind: DsList, List: NewList()}
+	return &DataStore{Kind: ObjList, List: NewList()}
 }
