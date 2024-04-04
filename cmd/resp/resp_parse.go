@@ -2,6 +2,7 @@ package resp
 
 import (
 	"bufio"
+	"errors"
 	"strconv"
 	"strings"
 )
@@ -34,10 +35,21 @@ func Read(r *bufio.Reader) (any, error) {
 	line := strings.Trim(l, "\r\n")
 
 	switch line[0] {
+	case RespNil:
+		return nil, nil
+	case RespBool:
+		if line[1] == 't' {
+			return true, nil
+		}
+		return false, nil
+	case RespInt:
+		return strconv.Atoi(line[1:])
 	case RespStatus:
 		return line[1:], nil
 	case RespString:
 		return readString(r, line)
+	case RespError:
+		return errors.New(line[1:]), nil
 	case RespArray:
 		return readSlice(r, line)
 	}
