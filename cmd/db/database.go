@@ -51,7 +51,7 @@ func (d *Database) Expire(key string, seconds int) bool {
 		return true
 	}
 
-	obj.expireIn(seconds)
+	obj.ExpireIn(seconds)
 	return true
 }
 
@@ -69,8 +69,10 @@ func (d *Database) Get(key string) (string, bool, error) {
 	return value, found, nil
 }
 
-func (d *Database) Set(key string, value string) {
-	d.objs[key] = newValueObj(value)
+func (d *Database) Set(key string, value string, expires int) {
+	obj := newValueObj(value)
+	obj.ExpireIn(expires)
+	d.objs[key] = obj
 }
 
 func (d *Database) Del(key string) {

@@ -107,7 +107,7 @@ func (s *Server) Execute(ctx *MemoContext, cmd *Command) {
 		}
 		ctx.Write(1)
 	case CmdSet:
-		s.db.Set(cmd.Key, cmd.Value)
+		s.db.Set(cmd.Key, cmd.Value, cmd.ExpireIn)
 		ctx.Ok()
 	case CmdGet:
 		value, found, err := s.db.Get(cmd.Key)

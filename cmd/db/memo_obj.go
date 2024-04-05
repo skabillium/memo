@@ -42,7 +42,8 @@ func (obj *MemoObj) asList() (*List, bool) {
 	return obj.List, obj.Kind == ObjList
 }
 
-func (obj *MemoObj) expireIn(seconds int) {
+// Set expiration for object in seconds
+func (obj *MemoObj) ExpireIn(seconds int) {
 	obj.ExpiresAt = time.Now().Unix() + int64(seconds)
 }
 

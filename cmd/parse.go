@@ -8,7 +8,7 @@ import (
 	"unicode"
 )
 
-type CommandType = byte
+var ErrNotInt = errors.New("ERR value is not an integer or out of range")
 
 func ErrUnknownCmd(cmd string) error {
 	return fmt.Errorf("ERR unknown command '%s'", cmd)
@@ -17,6 +17,8 @@ func ErrUnknownCmd(cmd string) error {
 func ErrInvalidNArg(cmd string) error {
 	return fmt.Errorf("invalid number of arguments for command '%s'", cmd)
 }
+
+type CommandType = byte
 
 const (
 	// Server commands
@@ -135,10 +137,22 @@ func ParseCommand(message string) (*Command, error) {
 		}
 		return hello, nil
 	case "set":
-		if argc != 3 {
+		if argc < 3 {
 			return nil, ErrInvalidNArg(cmd)
 		}
-		return &Command{Kind: CmdSet, Key: split[1], Value: split[2]}, nil
+		set := &Command{Kind: CmdSet, Key: split[1], Value: split[2]}
+		if argc > 2 && strings.ToLower(split[3]) == "ex" {
+			// Parse expiration option
+			if argc != 5 {
+				return nil, errors.New("invalid number of arguments for expiration option")
+			}
+			seconds, err := strconv.Atoi(split[4])
+			if err != nil {
+				return nil, ErrNotInt
+			}
+			set.ExpireIn = seconds
+		}
+		return set, nil
 	case "get":
 		if argc != 2 {
 			return nil, ErrInvalidNArg(cmd)
@@ -157,7 +171,7 @@ func ParseCommand(message string) (*Command, error) {
 		if argc == 4 {
 			priority, err := strconv.Atoi(split[3])
 			if err != nil {
-				return nil, err
+				return nil, ErrNotInt
 			}
 			qadd.Priority = priority
 		}
