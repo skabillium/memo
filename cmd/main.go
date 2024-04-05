@@ -119,6 +119,16 @@ func (s *Server) Execute(ctx *MemoContext, message string) {
 		case CmdFlushAll:
 			s.db.FlushAll()
 			ctx.Ok()
+		case CmdCleanup:
+			deleted := s.db.CleanupExpired()
+			ctx.Write(deleted)
+		case CmdExpire:
+			ok := s.db.Expire(cmd.Key, cmd.ExpireIn)
+			if !ok {
+				ctx.Write(0)
+				break
+			}
+			ctx.Write(1)
 		case CmdSet:
 			s.db.Set(cmd.Key, cmd.Value)
 			ctx.Ok()
@@ -142,7 +152,7 @@ func (s *Server) Execute(ctx *MemoContext, message string) {
 			ctx.Ok()
 		case CmdQueueAdd:
 			s.db.PQAdd(cmd.Key, cmd.Value, cmd.Priority)
-			ctx.Ok()
+			ctx.Write(1)
 		case CmdQueuePop:
 			value, found, err := s.db.PQPop(cmd.Key)
 			if err != nil {

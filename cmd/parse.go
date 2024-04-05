@@ -18,6 +18,8 @@ const (
 	CmdHello
 	CmdInfo
 	CmdFlushAll
+	CmdCleanup
+	CmdExpire
 	// KV
 	CmdSet
 	CmdGet
@@ -45,6 +47,7 @@ type Command struct {
 	Key   string
 	Value string
 
+	ExpireIn    int         // expire
 	Priority    int         // pqadd
 	Auth        AuthOptions // hello
 	RespVersion string      // hello
@@ -75,6 +78,18 @@ func ParseCommands(message string) ([]Command, error) {
 			commands = append(commands, Command{Kind: CmdInfo})
 		case "flushall":
 			commands = append(commands, Command{Kind: CmdFlushAll})
+		case "cleanup":
+			commands = append(commands, Command{Kind: CmdCleanup})
+		case "expire":
+			if i+2 >= len(split) {
+				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
+			}
+			seconds, err := strconv.Atoi(split[i+2])
+			if err != nil {
+				return nil, err
+			}
+			commands = append(commands, Command{Kind: CmdExpire, Key: split[i+1], ExpireIn: seconds})
+			i += 2
 		case "hello":
 			if i+1 > len(split) {
 				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)

@@ -1,5 +1,7 @@
 package db
 
+import "time"
+
 type MemoObjType = byte
 
 const (
@@ -9,21 +11,22 @@ const (
 )
 
 type MemoObj struct {
-	Kind   MemoObjType
-	Value  string
-	PQueue *PriorityQueue
-	List   *List
+	Kind      MemoObjType
+	Value     string
+	ExpiresAt int64
+	PQueue    *PriorityQueue
+	List      *List
 }
 
-func (d *Database) newValueObj(value string) *MemoObj {
+func newValueObj(value string) *MemoObj {
 	return &MemoObj{Kind: ObjValue, Value: value}
 }
 
-func (d *Database) newPQueueObj() *MemoObj {
+func newPQueueObj() *MemoObj {
 	return &MemoObj{Kind: ObjPQueue, PQueue: NewPriorityQueue()}
 }
 
-func (d *Database) newListObj() *MemoObj {
+func newListObj() *MemoObj {
 	return &MemoObj{Kind: ObjList, List: NewList()}
 }
 
@@ -37,4 +40,12 @@ func (obj *MemoObj) asPQueue() (*PriorityQueue, bool) {
 
 func (obj *MemoObj) asList() (*List, bool) {
 	return obj.List, obj.Kind == ObjList
+}
+
+func (obj *MemoObj) expireIn(seconds int) {
+	obj.ExpiresAt = time.Now().Unix() + int64(seconds)
+}
+
+func (obj *MemoObj) hasExpired() bool {
+	return obj.ExpiresAt != 0 && obj.ExpiresAt < time.Now().Unix()
 }

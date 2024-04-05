@@ -16,17 +16,45 @@ func (d *Database) FlushAll() {
 	d.objs = make(map[string]*MemoObj)
 }
 
+func (d *Database) CleanupExpired() int {
+	deleted := 0
+	for k, obj := range d.objs {
+		if obj.hasExpired() {
+			delete(d.objs, k)
+			deleted++
+		}
+	}
+
+	return deleted
+}
+
 func (d *Database) Keys() []string {
 	keys := make([]string, len(d.objs))
+	var i int
 	for k := range d.objs {
-		keys = append(keys, k)
+		keys[i] = k
+		i++
 	}
 
 	return keys
 }
 
+func (d *Database) Expire(key string, seconds int) bool {
+	obj, found := d.getObj(key)
+	if !found {
+		return found
+	}
+	if seconds <= 0 {
+		d.Del(key)
+		return true
+	}
+
+	obj.expireIn(seconds)
+	return true
+}
+
 func (d *Database) Get(key string) (string, bool, error) {
-	obj, found := d.objs[key]
+	obj, found := d.getObj(key)
 	if !found {
 		return "", found, nil
 	}
@@ -40,7 +68,7 @@ func (d *Database) Get(key string) (string, bool, error) {
 }
 
 func (d *Database) Set(key string, value string) {
-	d.objs[key] = d.newValueObj(value)
+	d.objs[key] = newValueObj(value)
 }
 
 func (d *Database) Del(key string) {
@@ -48,9 +76,9 @@ func (d *Database) Del(key string) {
 }
 
 func (d *Database) PQAdd(qname string, value string, priority int) error {
-	obj, found := d.objs[qname]
+	obj, found := d.getObj(qname)
 	if !found {
-		obj = d.newPQueueObj()
+		obj = newPQueueObj()
 	}
 
 	pqueue, ok := obj.asPQueue()
@@ -67,7 +95,7 @@ func (d *Database) PQAdd(qname string, value string, priority int) error {
 }
 
 func (d *Database) PQPop(qname string) (string, bool, error) {
-	obj, found := d.objs[qname]
+	obj, found := d.getObj(qname)
 	if !found {
 		return "", found, nil
 	}
@@ -86,7 +114,7 @@ func (d *Database) PQPop(qname string) (string, bool, error) {
 }
 
 func (d *Database) PQLen(qname string) (int, bool, error) {
-	obj, found := d.objs[qname]
+	obj, found := d.getObj(qname)
 	if !found {
 		return -1, found, nil
 	}
@@ -100,9 +128,9 @@ func (d *Database) PQLen(qname string) (int, bool, error) {
 }
 
 func (d *Database) LPush(lname string, value string) error {
-	obj, found := d.objs[lname]
+	obj, found := d.getObj(lname)
 	if !found {
-		obj = d.newListObj()
+		obj = newListObj()
 	}
 
 	list, ok := obj.asList()
@@ -119,9 +147,9 @@ func (d *Database) LPush(lname string, value string) error {
 }
 
 func (d *Database) RPush(lname string, value string) error {
-	obj, found := d.objs[lname]
+	obj, found := d.getObj(lname)
 	if !found {
-		obj = d.newListObj()
+		obj = newListObj()
 	}
 
 	list, ok := obj.asList()
@@ -138,7 +166,7 @@ func (d *Database) RPush(lname string, value string) error {
 }
 
 func (d *Database) LPop(lname string) (string, bool, error) {
-	obj, found := d.objs[lname]
+	obj, found := d.getObj(lname)
 	if !found {
 		return "", found, nil
 	}
@@ -157,7 +185,7 @@ func (d *Database) LPop(lname string) (string, bool, error) {
 }
 
 func (d *Database) RPop(lname string) (string, bool, error) {
-	obj, found := d.objs[lname]
+	obj, found := d.getObj(lname)
 	if !found {
 		return "", found, nil
 	}
@@ -176,7 +204,7 @@ func (d *Database) RPop(lname string) (string, bool, error) {
 }
 
 func (d *Database) LLen(lname string) (int, error) {
-	obj, found := d.objs[lname]
+	obj, found := d.getObj(lname)
 	if !found {
 		return -1, nil
 	}
@@ -187,4 +215,18 @@ func (d *Database) LLen(lname string) (int, error) {
 	}
 
 	return list.Length, nil
+}
+
+func (d *Database) getObj(key string) (*MemoObj, bool) {
+	obj, found := d.objs[key]
+	if !found {
+		return nil, found
+	}
+
+	if obj.hasExpired() {
+		d.Del(key)
+		return nil, false
+	}
+
+	return obj, true
 }
