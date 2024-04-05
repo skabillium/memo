@@ -6,7 +6,9 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"net"
+	"os"
 	"skabillium/memo/cmd/db"
 	"skabillium/memo/cmd/resp"
 	"sync"
@@ -19,9 +21,12 @@ const DefaultUser = "memo"
 const DefaultPassword = "password"
 const CurrentRespVersion = "2"
 
+const WalName = "wal.log"
+
 var ErrNoAuth = errors.New("NOAUTH Authentication required")
 var ErrWrongPass = errors.New("WRONGPASS invalid username-password pair or user is disabled")
 var ErrNoProto = errors.New("NOPROTO unsupported protocol version")
+var ErrUnsupportedType = errors.New("ERR unsupported type for request")
 
 type MemoContext struct {
 	conn    net.Conn
@@ -76,122 +81,111 @@ func (c *MemoContext) Ok() {
 	c.Simple("OK")
 }
 
-func (s *Server) Execute(ctx *MemoContext, cmd *Command) {
+func (s *Server) Execute(cmd *Command) (any, bool) {
 	switch cmd.Kind {
 	case CmdVersion:
-		ctx.Write(MemoVersion)
+		return MemoVersion, true
 	case CmdPing:
-		ctx.Simple("PONG")
+		return "PONG", true
 	case CmdHello:
 		if cmd.RespVersion != CurrentRespVersion {
-			ctx.Error(ErrNoProto)
-			break
+			return ErrNoProto, false
 		}
-		ctx.Write(s.Info)
+		return s.Info, false
 	case CmdInfo:
-		ctx.Write("Memo server version " + MemoVersion)
+		return "Memo server version " + MemoVersion, false
 	case CmdKeys:
 		keys := s.db.Keys()
-		ctx.Write(keys)
+		return keys, false
 	case CmdFlushAll:
 		s.db.FlushAll()
-		ctx.Ok()
+		return "OK", true
 	case CmdCleanup:
 		deleted := s.db.CleanupExpired()
-		ctx.Write(deleted)
+		return deleted, false
 	case CmdExpire:
 		ok := s.db.Expire(cmd.Key, cmd.ExpireIn)
 		if !ok {
-			ctx.Write(0)
-			break
+			return 0, false
 		}
-		ctx.Write(1)
+		return 1, false
 	case CmdSet:
 		s.db.Set(cmd.Key, cmd.Value, cmd.ExpireIn)
-		ctx.Ok()
+		return "OK", true
 	case CmdGet:
 		value, found, err := s.db.Get(cmd.Key)
 		if err != nil {
-			ctx.Error(err)
-			break
+			return err, false
 		}
 
 		if !found {
-			ctx.Write(nil)
-			break
+			return nil, false
 		}
 
-		ctx.Write(value)
+		return value, false
 	case CmdList:
-		ctx.Error(errors.New("ERR unsupported command 'list'"))
+		return errors.New("ERR unsupported command 'list'"), false
 	case CmdDel:
 		s.db.Del(cmd.Key)
-		ctx.Ok()
+		return "OK", true
 	case CmdQueueAdd:
 		s.db.PQAdd(cmd.Key, cmd.Value, cmd.Priority)
-		ctx.Write(1)
+		return 1, false
 	case CmdQueuePop:
 		value, found, err := s.db.PQPop(cmd.Key)
 		if err != nil {
-			ctx.Error(err)
-			break
+			return err, false
 		}
 
 		if !found {
-			ctx.Write(nil)
-			break
+			return nil, false
 		}
 
-		ctx.Write(value)
+		return value, false
 	case CmdQueueLen:
 		length, found, err := s.db.PQLen(cmd.Key)
 		if err != nil {
-			ctx.Error(err)
-			break
+			return err, false
 		}
 
 		if !found {
-			ctx.Write(nil)
-			break
+			return nil, false
 		}
 
-		ctx.Write(length)
+		return length, false
 	case CmdLPush:
 		s.db.LPush(cmd.Key, cmd.Values)
-		ctx.Write(len(cmd.Values))
+		return len(cmd.Values), false
 	case CmdRPush:
 		s.db.RPush(cmd.Key, cmd.Values)
-		ctx.Write(len(cmd.Values))
+		return len(cmd.Values), false
 	case CmdLPop:
 		value, found, err := s.db.LPop(cmd.Key)
 		if err != nil {
-			ctx.Error(err)
-			break
+			return err, false
 		}
 		if !found {
-			ctx.Write(nil)
-			break
+			return nil, false
 		}
-		ctx.Write(value)
+		return value, false
 	case CmdRPop:
 		value, found, err := s.db.RPop(cmd.Key)
 		if err != nil {
-			ctx.Error(err)
-			break
+			return err, false
 		}
 		if !found {
-			ctx.Write(nil)
-			break
+			return nil, false
 		}
-		ctx.Write(value)
+		return value, false
 	case CmdLLen:
 		length, err := s.db.LLen(cmd.Key)
 		if err != nil {
-			ctx.Error(err)
-			break
+			return err, false
 		}
-		ctx.Write(length)
+		return length, false
 	}
+
+	return nil, false
 }
 
 type ServerInfo struct {
@@ -207,12 +201,15 @@ type Server struct {
 	port   string
 	ln     net.Listener
 	quitCh chan struct{}
+
+	db         *db.Database
+	walEnabled bool
+	wal        *WAL
+
 	// Auth
 	user        string
 	password    string
 	requireAuth bool
-	// Db
-	db *db.Database
 	// Server info
 	connMu sync.Mutex // Mutex to increment connections
 	Info   ServerInfo
@@ -240,6 +237,11 @@ func (s *Server) Auth(user string, password string) {
 	s.password = password
 }
 
+func (s *Server) EnableWal(wal *WAL) {
+	s.walEnabled = true
+	s.wal = wal
+}
+
 func (s *Server) newConn() {
 	s.connMu.Lock()
 	defer s.connMu.Unlock()
@@ -254,6 +256,29 @@ func (s *Server) closeConn(conn net.Conn) {
 	s.Info.Connections--
 }
 
+func (s *Server) BuildDbFromWal() (int, error) {
+	file, err := os.Open(WalName)
+	if err != nil {
+		return -1, err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	ops := 0
+	for scanner.Scan() {
+		line := scanner.Text()
+		command, err := ParseCommand(line)
+		if err != nil {
+			return -1, fmt.Errorf("Error while executing command: '%s'", line)
+		}
+
+		s.Execute(command)
+		ops++
+	}
+
+	return ops, nil
+}
+
 func (s *Server) Start() error {
 	ln, err := net.Listen("tcp", "localhost:"+s.port)
 	if err != nil {
@@ -262,6 +287,9 @@ func (s *Server) Start() error {
 	defer ln.Close()
 
 	fmt.Println("Memo server started on port", s.port)
+	if s.walEnabled {
+		fmt.Println("WAL enabled:", WalName)
+	}
 
 	s.ln = ln
 	go s.acceptLoop()
@@ -299,28 +327,36 @@ func (s *Server) handleConnection(conn net.Conn) {
 		exec, err := StringifyRequest(req)
 		if err != nil {
 			ctx.EndWith(err)
-			break
+			continue
 		}
 
 		command, err := ParseCommand(exec)
 		if err != nil {
 			ctx.EndWith(err)
-			break
+			continue
 		}
 
-		// TODO: Maybe use pointers to arrays instead of copying arrays left and right
 		if err = s.CanExecute(ctx, command); err != nil {
 			ctx.EndWith(err)
-			break
+			continue
 		}
 
-		s.Execute(ctx, command)
+		if s.walEnabled {
+			s.wal.Writeln(exec)
+		}
+
+		res, simple := s.Execute(command)
+		if simple {
+			ctx.Simple(res.(string))
+		} else {
+			ctx.Write(res)
+		}
 		ctx.End()
 	}
 }
 
 func (s *Server) CanExecute(ctx *MemoContext, command *Command) error {
-	if !ctx.hasAuth && s.requireAuth {
+	if s.requireAuth && !ctx.hasAuth {
 		if command.Kind != CmdHello && command.Kind != CmdAuth {
 			return ErrNoAuth
 		}
@@ -344,7 +380,7 @@ func StringifyRequest(req any) (string, error) {
 		for i, v := range req {
 			s, ok := v.(string)
 			if !ok {
-				return "", fmt.Errorf("could not cast '%v' to string", v)
+				return "", ErrUnsupportedType
 			}
 			if i != 0 {
 				exec += " "
@@ -352,7 +388,7 @@ func StringifyRequest(req any) (string, error) {
 			exec += s
 		}
 	default:
-		return "", errors.New("unsupported type for request")
+		return "", ErrUnsupportedType
 	}
 
 	return exec, nil
@@ -361,6 +397,7 @@ func StringifyRequest(req any) (string, error) {
 type ServerOptions struct {
 	Port       string
 	EnableAuth bool
+	EnableWal  bool
 	User       string
 	Password   string
 }
@@ -370,6 +407,7 @@ func getServerOptions() *ServerOptions {
 		port        string
 		portSr      string
 		disableAuth bool
+		enableWal   bool
 		user        string
 		userSr      string
 		password    string
@@ -379,6 +417,7 @@ func getServerOptions() *ServerOptions {
 	flag.StringVar(&port, "port", "", "Port to run server")
 	flag.StringVar(&portSr, "p", "", "Shorthand for port")
 	flag.BoolVar(&disableAuth, "noauth", false, "Disable authentication")
+	flag.BoolVar(&enableWal, "wal", false, "Enable write ahead log authentication")
 	flag.StringVar(&user, "user", "", "User for authentication")
 	flag.StringVar(&userSr, "u", "", "Shorthand for user")
 	flag.StringVar(&password, "password", "", "Password for authentication")
@@ -412,6 +451,7 @@ func getServerOptions() *ServerOptions {
 	options := &ServerOptions{
 		Port:       port,
 		EnableAuth: !disableAuth,
+		EnableWal:  enableWal,
 		User:       user,
 		Password:   password,
 	}
@@ -419,11 +459,35 @@ func getServerOptions() *ServerOptions {
 	return options
 }
 
+func FileExists(filename string) bool {
+	_, err := os.Stat(filename)
+	return !errors.Is(err, os.ErrNotExist)
+}
+
 func main() {
 	options := getServerOptions()
 	server := NewServer(options.Port)
 	if options.EnableAuth {
 		server.Auth(options.User, options.Password)
+	}
+
+	if options.EnableWal {
+		if FileExists(WalName) {
+			ops, err := server.BuildDbFromWal()
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			fmt.Printf("Built database from %d commands\n", ops)
+		}
+
+		wal, err := NewWal()
+		if err != nil {
+			// TODO: Handle this differently
+			log.Fatal("Could not initialize wal")
+		}
+		defer wal.Close()
+		server.EnableWal(wal)
 	}
 
 	server.Start()

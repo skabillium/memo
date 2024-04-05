@@ -8,8 +8,6 @@ import (
 	"unicode"
 )
 
-var ErrNotInt = errors.New("ERR value is not an integer or out of range")
-
 func ErrUnknownCmd(cmd string) error {
 	return fmt.Errorf("ERR unknown command '%s'", cmd)
 }
@@ -17,6 +15,8 @@ func ErrUnknownCmd(cmd string) error {
 func ErrInvalidNArg(cmd string) error {
 	return fmt.Errorf("invalid number of arguments for command '%s'", cmd)
 }
+
+var ErrNotInt = errors.New("ERR value is not an integer or out of range")
 
 type CommandType = byte
 
@@ -141,7 +141,7 @@ func ParseCommand(message string) (*Command, error) {
 			return nil, ErrInvalidNArg(cmd)
 		}
 		set := &Command{Kind: CmdSet, Key: split[1], Value: split[2]}
-		if argc > 2 && strings.ToLower(split[3]) == "ex" {
+		if argc > 3 && strings.ToLower(split[3]) == "ex" {
 			// Parse expiration option
 			if argc != 5 {
 				return nil, errors.New("invalid number of arguments for expiration option")
