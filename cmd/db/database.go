@@ -1,6 +1,8 @@
 package db
 
-import "errors"
+import (
+	"errors"
+)
 
 var ErrWrongType = errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
 
@@ -127,7 +129,7 @@ func (d *Database) PQLen(qname string) (int, bool, error) {
 	return pqueue.Length, found, nil
 }
 
-func (d *Database) LPush(lname string, value string) error {
+func (d *Database) LPush(lname string, values []string) error {
 	obj, found := d.getObj(lname)
 	if !found {
 		obj = newListObj()
@@ -138,7 +140,9 @@ func (d *Database) LPush(lname string, value string) error {
 		return ErrWrongType
 	}
 
-	list.Prepend(value)
+	for i := 0; i < len(values); i++ {
+		list.Prepend(values[i])
+	}
 	if !found {
 		d.objs[lname] = obj
 	}
@@ -146,7 +150,7 @@ func (d *Database) LPush(lname string, value string) error {
 	return nil
 }
 
-func (d *Database) RPush(lname string, value string) error {
+func (d *Database) RPush(lname string, values []string) error {
 	obj, found := d.getObj(lname)
 	if !found {
 		obj = newListObj()
@@ -157,7 +161,9 @@ func (d *Database) RPush(lname string, value string) error {
 		return ErrWrongType
 	}
 
-	list.Append(value)
+	for i := 0; i < len(values); i++ {
+		list.Append(values[i])
+	}
 	if !found {
 		d.objs[lname] = obj
 	}

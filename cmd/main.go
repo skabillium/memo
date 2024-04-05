@@ -157,11 +157,11 @@ func (s *Server) Execute(ctx *MemoContext, cmd *Command) {
 
 		ctx.Write(length)
 	case CmdLPush:
-		s.db.LPush(cmd.Key, cmd.Value)
-		ctx.Write(1)
+		s.db.LPush(cmd.Key, cmd.Values)
+		ctx.Write(len(cmd.Values))
 	case CmdRPush:
-		s.db.RPush(cmd.Key, cmd.Value)
-		ctx.Write(1)
+		s.db.RPush(cmd.Key, cmd.Values)
+		ctx.Write(len(cmd.Values))
 	case CmdLPop:
 		value, found, err := s.db.LPop(cmd.Key)
 		if err != nil {

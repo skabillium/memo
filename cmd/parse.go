@@ -52,9 +52,10 @@ type AuthOptions struct {
 }
 
 type Command struct {
-	Kind  CommandType
-	Key   string
-	Value string
+	Kind   CommandType
+	Key    string
+	Value  string
+	Values []string
 
 	ExpireIn    int         // expire
 	Priority    int         // pqadd
@@ -172,20 +173,24 @@ func ParseCommand(message string) (*Command, error) {
 		}
 		return &Command{Kind: CmdQueueLen, Key: split[1]}, nil
 	case "lpush":
-		if argc != 3 {
+		if argc < 3 {
 			return nil, ErrInvalidNArg(cmd)
 		}
-		return &Command{Kind: CmdLPush, Key: split[1], Value: split[2]}, nil
+		lpush := &Command{Kind: CmdLPush, Key: split[1], Values: []string{}}
+		lpush.Values = append(lpush.Values, split[2:]...)
+		return lpush, nil
 	case "lpop":
 		if argc != 2 {
 			return nil, ErrInvalidNArg(cmd)
 		}
 		return &Command{Kind: CmdLPop, Key: split[1]}, nil
 	case "rpush":
-		if argc != 3 {
+		if argc < 3 {
 			return nil, ErrInvalidNArg(cmd)
 		}
-		return &Command{Kind: CmdRPush, Key: split[1], Value: split[2]}, nil
+		rpush := &Command{Kind: CmdRPush, Key: split[1], Values: []string{}}
+		rpush.Values = append(rpush.Values, split[2:]...)
+		return rpush, nil
 	case "rpop":
 		if argc != 2 {
 			return nil, ErrInvalidNArg(cmd)
