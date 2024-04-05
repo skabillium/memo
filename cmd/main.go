@@ -19,6 +19,10 @@ const DefaultUser = "memo"
 const DefaultPassword = "password"
 const CurrentRespVersion = "2"
 
+var ErrNoAuth = errors.New("NOAUTH Authentication required")
+var ErrWrongPass = errors.New("WRONGPASS invalid username-password pair or user is disabled")
+var ErrNoProto = errors.New("NOPROTO unsupported protocol version")
+
 type MemoContext struct {
 	conn    net.Conn
 	rw      *bufio.ReadWriter
@@ -72,37 +76,7 @@ func (c *MemoContext) Ok() {
 	c.Simple("OK")
 }
 
-func (s *Server) Execute(ctx *MemoContext, message string) {
-	commands, err := ParseCommands(message)
-	if err != nil {
-		ctx.Error(err)
-		return
-	}
-
-	if !ctx.hasAuth && s.requireAuth {
-		if len(commands) == 0 {
-			return
-		}
-
-		hello := commands[0]
-		if hello.Kind != CmdHello {
-			ctx.Error(errors.New("authentication required"))
-			return
-		}
-
-		if hello.RespVersion != CurrentRespVersion {
-			ctx.Error(errors.New("NOPROTO unsupported protocol version"))
-			return
-		}
-
-		if !(hello.Auth.User == s.user && hello.Auth.Password == s.password) {
-			ctx.Error(errors.New("WRONGPASS invalid username-password pair or user is disabled"))
-			return
-		}
-
-		ctx.Authenticate()
-	}
-
+func (s *Server) Execute(ctx *MemoContext, commands []Command) {
 	for _, cmd := range commands {
 		switch cmd.Kind {
 		case CmdVersion:
@@ -320,36 +294,82 @@ func (s *Server) handleConnection(conn net.Conn) {
 			break
 		}
 
-		var exec string
-		switch req := req.(type) {
-		case string:
-			exec = req
-		case []any:
-			for i, v := range req {
-				s, ok := v.(string)
-				if !ok {
-					fmt.Println("Could not cast", v, "to string")
-					break
-				}
-				if i != 0 {
-					exec += " "
-				}
-				exec += s
-			}
-		default:
-			ctx.Error(errors.New("unsupported type for request"))
+		exec, err := ParseRequest(req)
+		if err != nil {
+			ctx.EndWith(err)
+			break
 		}
 
-		s.Execute(ctx, exec)
+		commands, err := ParseCommands(exec)
+		if err != nil {
+			ctx.EndWith(err)
+			break
+		}
+
+		// TODO: Maybe use pointers to arrays instead of copying arrays left and right
+		if err = s.CanExecute(ctx, commands); err != nil {
+			ctx.EndWith(err)
+			break
+		}
+
+		s.Execute(ctx, commands)
 		ctx.End()
 	}
 }
 
+func (s *Server) CanExecute(ctx *MemoContext, commands []Command) error {
+	if !ctx.hasAuth && s.requireAuth {
+		if len(commands) == 0 {
+			return ErrNoAuth
+		}
+
+		hello := commands[0]
+		if hello.Kind != CmdHello {
+			return ErrNoAuth
+		}
+
+		if hello.RespVersion != CurrentRespVersion {
+			return ErrNoProto
+		}
+
+		if !(hello.Auth.User == s.user && hello.Auth.Password == s.password) {
+			return ErrWrongPass
+		}
+
+		ctx.Authenticate()
+	}
+
+	return nil
+}
+
+func ParseRequest(req any) (string, error) {
+	var exec string
+	switch req := req.(type) {
+	case string:
+		exec = req
+	case []any:
+		for i, v := range req {
+			s, ok := v.(string)
+			if !ok {
+				return "", fmt.Errorf("could not cast '%v' to string", v)
+			}
+			if i != 0 {
+				exec += " "
+			}
+			exec += s
+		}
+	default:
+		return "", errors.New("unsupported type for request")
+	}
+
+	return exec, nil
+}
+
 type ServerOptions struct {
-	Port        string
-	DisableAuth bool
-	User        string
-	Password    string
+	Port       string
+	EnableAuth bool
+	User       string
+	Password   string
 }
 
 func getServerOptions() *ServerOptions {
@@ -397,10 +417,10 @@ func getServerOptions() *ServerOptions {
 	}
 
 	options := &ServerOptions{
-		Port:        port,
-		DisableAuth: disableAuth,
-		User:        user,
-		Password:    password,
+		Port:       port,
+		EnableAuth: !disableAuth,
+		User:       user,
+		Password:   password,
 	}
 
 	return options
@@ -409,7 +429,7 @@ func getServerOptions() *ServerOptions {
 func main() {
 	options := getServerOptions()
 	server := NewServer(options.Port)
-	if !options.DisableAuth {
+	if options.EnableAuth {
 		server.Auth(options.User, options.Password)
 	}
 

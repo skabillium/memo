@@ -26,6 +26,11 @@ const (
 	RespPush      = '>' // ><len>\r\n... (same as Array)
 )
 
+func ReadString(str string) (any, error) {
+	r := bufio.NewReader(strings.NewReader(str))
+	return Read(r)
+}
+
 func Read(r *bufio.Reader) (any, error) {
 	l, err := r.ReadString('\n')
 	if err != nil {
