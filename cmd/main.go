@@ -95,7 +95,7 @@ func (s *Server) Execute(cmd *Command) (any, bool) {
 	case CmdInfo:
 		return "Memo server version " + MemoVersion, false
 	case CmdKeys:
-		keys := s.db.Keys()
+		keys := s.db.Keys(cmd.Pattern)
 		return keys, false
 	case CmdFlushAll:
 		s.db.FlushAll()

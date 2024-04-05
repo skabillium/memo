@@ -2,6 +2,7 @@ package db
 
 import (
 	"errors"
+	"path/filepath"
 )
 
 var ErrWrongType = errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
@@ -30,12 +31,17 @@ func (d *Database) CleanupExpired() int {
 	return deleted
 }
 
-func (d *Database) Keys() []string {
-	keys := make([]string, len(d.objs))
-	var i int
+func (d *Database) Keys(pattern string) []string {
+	keys := []string{}
 	for k := range d.objs {
-		keys[i] = k
-		i++
+		match, err := filepath.Match(pattern, k)
+		if err != nil {
+			break
+		}
+
+		if match {
+			keys = append(keys, k)
+		}
 	}
 
 	return keys

@@ -59,6 +59,7 @@ type Command struct {
 	Value  string
 	Values []string
 
+	Pattern     string      // keys
 	ExpireIn    int         // expire
 	Priority    int         // pqadd
 	Auth        AuthOptions // hello
@@ -89,10 +90,15 @@ func ParseCommand(message string) (*Command, error) {
 		}
 		return &Command{Kind: CmdPing}, nil
 	case "keys":
-		if argc != 1 {
+		if argc > 2 {
 			return nil, ErrInvalidNArg(cmd)
 		}
-		return &Command{Kind: CmdKeys}, nil
+
+		keys := &Command{Kind: CmdKeys, Pattern: "*"}
+		if argc == 2 {
+			keys.Pattern = split[1]
+		}
+		return keys, nil
 	case "info":
 		if argc != 1 {
 			return nil, ErrInvalidNArg(cmd)
