@@ -76,119 +76,121 @@ func (c *MemoContext) Ok() {
 	c.Simple("OK")
 }
 
-func (s *Server) Execute(ctx *MemoContext, commands []Command) {
-	for _, cmd := range commands {
-		switch cmd.Kind {
-		case CmdVersion:
-			ctx.Write(MemoVersion)
-		case CmdPing:
-			ctx.Simple("PONG")
-		case CmdHello:
-			ctx.Write(s.Info)
-		case CmdInfo:
-			ctx.Write("Memo server version " + MemoVersion)
-		case CmdKeys:
-			keys := s.db.Keys()
-			ctx.Write(keys)
-		case CmdFlushAll:
-			s.db.FlushAll()
-			ctx.Ok()
-		case CmdCleanup:
-			deleted := s.db.CleanupExpired()
-			ctx.Write(deleted)
-		case CmdExpire:
-			ok := s.db.Expire(cmd.Key, cmd.ExpireIn)
-			if !ok {
-				ctx.Write(0)
-				break
-			}
-			ctx.Write(1)
-		case CmdSet:
-			s.db.Set(cmd.Key, cmd.Value)
-			ctx.Ok()
-		case CmdGet:
-			value, found, err := s.db.Get(cmd.Key)
-			if err != nil {
-				ctx.Error(err)
-				break
-			}
-
-			if !found {
-				ctx.Write(nil)
-				break
-			}
-
-			ctx.Write(value)
-		case CmdList:
-			ctx.Error(errors.New("ERR unsupported command 'list'"))
-		case CmdDel:
-			s.db.Del(cmd.Key)
-			ctx.Ok()
-		case CmdQueueAdd:
-			s.db.PQAdd(cmd.Key, cmd.Value, cmd.Priority)
-			ctx.Write(1)
-		case CmdQueuePop:
-			value, found, err := s.db.PQPop(cmd.Key)
-			if err != nil {
-				ctx.Error(err)
-				break
-			}
-
-			if !found {
-				ctx.Write(nil)
-				break
-			}
-
-			ctx.Write(value)
-		case CmdQueueLen:
-			length, found, err := s.db.PQLen(cmd.Key)
-			if err != nil {
-				ctx.Error(err)
-				break
-			}
-
-			if !found {
-				ctx.Write(nil)
-				break
-			}
-
-			ctx.Write(length)
-		case CmdLPush:
-			s.db.LPush(cmd.Key, cmd.Value)
-			ctx.Write(1)
-		case CmdRPush:
-			s.db.RPush(cmd.Key, cmd.Value)
-			ctx.Write(1)
-		case CmdLPop:
-			value, found, err := s.db.LPop(cmd.Key)
-			if err != nil {
-				ctx.Error(err)
-				break
-			}
-			if !found {
-				ctx.Write(nil)
-				break
-			}
-			ctx.Write(value)
-		case CmdRPop:
-			value, found, err := s.db.RPop(cmd.Key)
-			if err != nil {
-				ctx.Error(err)
-				break
-			}
-			if !found {
-				ctx.Write(nil)
-				break
-			}
-			ctx.Write(value)
-		case CmdLLen:
-			length, err := s.db.LLen(cmd.Key)
-			if err != nil {
-				ctx.Error(err)
-				break
-			}
-			ctx.Write(length)
+func (s *Server) Execute(ctx *MemoContext, cmd *Command) {
+	switch cmd.Kind {
+	case CmdVersion:
+		ctx.Write(MemoVersion)
+	case CmdPing:
+		ctx.Simple("PONG")
+	case CmdHello:
+		if cmd.RespVersion != CurrentRespVersion {
+			ctx.Error(ErrNoProto)
+			break
 		}
+		ctx.Write(s.Info)
+	case CmdInfo:
+		ctx.Write("Memo server version " + MemoVersion)
+	case CmdKeys:
+		keys := s.db.Keys()
+		ctx.Write(keys)
+	case CmdFlushAll:
+		s.db.FlushAll()
+		ctx.Ok()
+	case CmdCleanup:
+		deleted := s.db.CleanupExpired()
+		ctx.Write(deleted)
+	case CmdExpire:
+		ok := s.db.Expire(cmd.Key, cmd.ExpireIn)
+		if !ok {
+			ctx.Write(0)
+			break
+		}
+		ctx.Write(1)
+	case CmdSet:
+		s.db.Set(cmd.Key, cmd.Value)
+		ctx.Ok()
+	case CmdGet:
+		value, found, err := s.db.Get(cmd.Key)
+		if err != nil {
+			ctx.Error(err)
+			break
+		}
+
+		if !found {
+			ctx.Write(nil)
+			break
+		}
+
+		ctx.Write(value)
+	case CmdList:
+		ctx.Error(errors.New("ERR unsupported command 'list'"))
+	case CmdDel:
+		s.db.Del(cmd.Key)
+		ctx.Ok()
+	case CmdQueueAdd:
+		s.db.PQAdd(cmd.Key, cmd.Value, cmd.Priority)
+		ctx.Write(1)
+	case CmdQueuePop:
+		value, found, err := s.db.PQPop(cmd.Key)
+		if err != nil {
+			ctx.Error(err)
+			break
+		}
+
+		if !found {
+			ctx.Write(nil)
+			break
+		}
+
+		ctx.Write(value)
+	case CmdQueueLen:
+		length, found, err := s.db.PQLen(cmd.Key)
+		if err != nil {
+			ctx.Error(err)
+			break
+		}
+
+		if !found {
+			ctx.Write(nil)
+			break
+		}
+
+		ctx.Write(length)
+	case CmdLPush:
+		s.db.LPush(cmd.Key, cmd.Value)
+		ctx.Write(1)
+	case CmdRPush:
+		s.db.RPush(cmd.Key, cmd.Value)
+		ctx.Write(1)
+	case CmdLPop:
+		value, found, err := s.db.LPop(cmd.Key)
+		if err != nil {
+			ctx.Error(err)
+			break
+		}
+		if !found {
+			ctx.Write(nil)
+			break
+		}
+		ctx.Write(value)
+	case CmdRPop:
+		value, found, err := s.db.RPop(cmd.Key)
+		if err != nil {
+			ctx.Error(err)
+			break
+		}
+		if !found {
+			ctx.Write(nil)
+			break
+		}
+		ctx.Write(value)
+	case CmdLLen:
+		length, err := s.db.LLen(cmd.Key)
+		if err != nil {
+			ctx.Error(err)
+			break
+		}
+		ctx.Write(length)
 	}
 }
 
@@ -294,45 +296,36 @@ func (s *Server) handleConnection(conn net.Conn) {
 			break
 		}
 
-		exec, err := ParseRequest(req)
+		exec, err := StringifyRequest(req)
 		if err != nil {
 			ctx.EndWith(err)
 			break
 		}
 
-		commands, err := ParseCommands(exec)
+		command, err := ParseCommand(exec)
 		if err != nil {
 			ctx.EndWith(err)
 			break
 		}
 
 		// TODO: Maybe use pointers to arrays instead of copying arrays left and right
-		if err = s.CanExecute(ctx, commands); err != nil {
+		if err = s.CanExecute(ctx, command); err != nil {
 			ctx.EndWith(err)
 			break
 		}
 
-		s.Execute(ctx, commands)
+		s.Execute(ctx, command)
 		ctx.End()
 	}
 }
 
-func (s *Server) CanExecute(ctx *MemoContext, commands []Command) error {
+func (s *Server) CanExecute(ctx *MemoContext, command *Command) error {
 	if !ctx.hasAuth && s.requireAuth {
-		if len(commands) == 0 {
+		if command.Kind != CmdHello && command.Kind != CmdAuth {
 			return ErrNoAuth
 		}
 
-		hello := commands[0]
-		if hello.Kind != CmdHello {
-			return ErrNoAuth
-		}
-
-		if hello.RespVersion != CurrentRespVersion {
-			return ErrNoProto
-		}
-
-		if !(hello.Auth.User == s.user && hello.Auth.Password == s.password) {
+		if !(command.Auth.User == s.user && command.Auth.Password == s.password) {
 			return ErrWrongPass
 		}
 
@@ -342,7 +335,7 @@ func (s *Server) CanExecute(ctx *MemoContext, commands []Command) error {
 	return nil
 }
 
-func ParseRequest(req any) (string, error) {
+func StringifyRequest(req any) (string, error) {
 	var exec string
 	switch req := req.(type) {
 	case string:

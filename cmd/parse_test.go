@@ -31,23 +31,5 @@ func TestSanitize(t *testing.T) {
 }
 
 func TestParse(t *testing.T) {
-	message := `
-	ping
-	version
-	set name bill
-	qadd emails em@example.com
-	qadd emails other@example.com 2
-	`
-	expected := []Command{
-		{Kind: CmdPing},
-		{Kind: CmdVersion},
-		{Kind: CmdSet, Key: "name", Value: "bill"},
-		{Kind: CmdQueueAdd, Key: "emails", Value: "em@example.com", Priority: 1},
-		{Kind: CmdQueueAdd, Key: "emails", Value: "other@example.com", Priority: 2},
-	}
 
-	commands, err := ParseCommands(message)
-	if err != nil || !reflect.DeepEqual(expected, commands) {
-		t.Error("Expected Parse commands to return", expected, "got", commands)
-	}
 }

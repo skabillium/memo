@@ -10,11 +10,20 @@ import (
 
 type CommandType = byte
 
+func ErrUnknownCmd(cmd string) error {
+	return fmt.Errorf("ERR unknown command '%s'", cmd)
+}
+
+func ErrInvalidNArg(cmd string) error {
+	return fmt.Errorf("invalid number of arguments for command '%s'", cmd)
+}
+
 const (
 	// Server commands
 	CmdVersion CommandType = iota
 	CmdPing
 	CmdKeys
+	CmdAuth
 	CmdHello
 	CmdInfo
 	CmdFlushAll
@@ -53,154 +62,143 @@ type Command struct {
 	RespVersion string      // hello
 }
 
-func ParseCommands(message string) ([]Command, error) {
+func ParseCommand(message string) (*Command, error) {
 	split, err := sanitize(message)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(split) == 0 {
+	argc := len(split)
+	if argc == 0 {
 		return nil, errors.New("empty message")
 	}
 
-	commands := []Command{}
-	i := 0
-	for i < len(split) {
-		cmd := split[i]
-		switch cmd {
-		case "version":
-			commands = append(commands, Command{Kind: CmdVersion})
-		case "ping":
-			commands = append(commands, Command{Kind: CmdPing})
-		case "keys":
-			commands = append(commands, Command{Kind: CmdKeys})
-		case "info":
-			commands = append(commands, Command{Kind: CmdInfo})
-		case "flushall":
-			commands = append(commands, Command{Kind: CmdFlushAll})
-		case "cleanup":
-			commands = append(commands, Command{Kind: CmdCleanup})
-		case "expire":
-			if i+2 >= len(split) {
-				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
+	cmd := strings.ToLower(split[0])
+	switch cmd {
+	case "version":
+		if argc != 1 {
+			return nil, ErrInvalidNArg(cmd)
+		}
+		return &Command{Kind: CmdVersion}, nil
+	case "ping":
+		if argc != 1 {
+			return nil, ErrInvalidNArg(cmd)
+		}
+		return &Command{Kind: CmdPing}, nil
+	case "keys":
+		if argc != 1 {
+			return nil, ErrInvalidNArg(cmd)
+		}
+		return &Command{Kind: CmdKeys}, nil
+	case "info":
+		if argc != 1 {
+			return nil, ErrInvalidNArg(cmd)
+		}
+		return &Command{Kind: CmdInfo}, nil
+	case "flushall":
+		if argc != 1 {
+			return nil, ErrInvalidNArg(cmd)
+		}
+		return &Command{Kind: CmdFlushAll}, nil
+	case "cleanup":
+		if argc != 1 {
+			return nil, ErrInvalidNArg(cmd)
+		}
+		return &Command{Kind: CmdCleanup}, nil
+	case "expire":
+		if argc != 3 {
+			return nil, ErrInvalidNArg(cmd)
+		}
+		seconds, err := strconv.Atoi(split[2])
+		if err != nil {
+			return nil, err
+		}
+		return &Command{Kind: CmdExpire, Key: split[1], ExpireIn: seconds}, nil
+	case "auth":
+		if argc != 3 {
+			return nil, ErrInvalidNArg(cmd)
+		}
+		return &Command{Kind: CmdAuth, Auth: AuthOptions{User: split[1], Password: split[2]}}, nil
+	case "hello":
+		if argc < 2 {
+			return nil, ErrInvalidNArg(cmd)
+		}
+		hello := &Command{Kind: CmdHello, RespVersion: split[1]}
+		if argc > 2 && strings.ToLower(split[2]) == "auth" {
+			if argc != 5 {
+				return nil, ErrInvalidNArg(cmd)
 			}
-			seconds, err := strconv.Atoi(split[i+2])
+
+			hello.Auth.User = split[3]
+			hello.Auth.Password = split[4]
+		}
+		return hello, nil
+	case "set":
+		if argc != 3 {
+			return nil, ErrInvalidNArg(cmd)
+		}
+		return &Command{Kind: CmdSet, Key: split[1], Value: split[2]}, nil
+	case "get":
+		if argc != 2 {
+			return nil, ErrInvalidNArg(cmd)
+		}
+		return &Command{Kind: CmdGet, Key: split[1]}, nil
+	case "del":
+		if argc != 2 {
+			return nil, ErrInvalidNArg(cmd)
+		}
+		return &Command{Kind: CmdDel, Key: split[1]}, nil
+	case "qadd":
+		if argc < 3 {
+			return nil, ErrInvalidNArg(cmd)
+		}
+		qadd := &Command{Kind: CmdQueueAdd, Key: split[1], Value: split[2], Priority: 1}
+		if argc == 4 {
+			priority, err := strconv.Atoi(split[3])
 			if err != nil {
 				return nil, err
 			}
-			commands = append(commands, Command{Kind: CmdExpire, Key: split[i+1], ExpireIn: seconds})
-			i += 2
-		case "hello":
-			if i+1 > len(split) {
-				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-			}
-
-			i++
-			hello := Command{Kind: CmdHello, RespVersion: split[i], Auth: AuthOptions{}}
-			if i+1 < len(split) && strings.ToLower(split[i+1]) == "auth" {
-				if i+3 >= len(split) {
-					return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-				}
-
-				hello.Auth.User = split[i+2]
-				hello.Auth.Password = split[i+3]
-				i += 3
-			}
-			commands = append(commands, hello)
-		case "set":
-			// Needs another 2 arguments
-			if i+2 > len(split) {
-				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-			}
-			commands = append(commands, Command{Kind: CmdSet, Key: split[i+1], Value: split[i+2]})
-			i += 2
-		case "get":
-			if i+1 > len(split) {
-				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-			}
-			commands = append(commands, Command{Kind: CmdGet, Key: split[i+1]})
-			i += 1
-		case "del":
-			if i+1 > len(split) {
-				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-			}
-			commands = append(commands, Command{Kind: CmdDel, Key: split[i+1]})
-			i += 1
-		case "list", "ls":
-			commands = append(commands, Command{Kind: CmdList})
-		case "qadd":
-			if i+2 > len(split) {
-				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-			}
-
-			pqadd := Command{Kind: CmdQueueAdd, Key: split[i+1], Value: split[i+2], Priority: 1}
-			// TODO: Refactor this
-			if i+3 < len(split) {
-				if priority, err := strconv.Atoi(split[i+3]); err == nil {
-					pqadd.Priority = priority
-					i += 3
-					commands = append(commands, pqadd)
-				} else {
-					commands = append(commands, pqadd)
-					i += 2
-				}
-
-			} else {
-				commands = append(commands, pqadd)
-				i += 2
-			}
-		case "qpop":
-			if i+1 > len(split) {
-				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-			}
-			commands = append(commands, Command{Kind: CmdQueuePop, Key: split[i+1]})
-			i += 1
-		case "qlen":
-			if i+1 > len(split) {
-				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-			}
-			commands = append(commands, Command{Kind: CmdQueueLen, Key: split[i+1]})
-			i += 1
-		case "lpush":
-			if i+2 > len(split) {
-				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-			}
-			commands = append(commands, Command{Kind: CmdLPush, Key: split[i+1], Value: split[i+2]})
-			i += 2
-		case "lpop":
-			if i+1 > len(split) {
-				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-			}
-			commands = append(commands, Command{Kind: CmdLPop, Key: split[i+1]})
-			i += 1
-		case "rpush":
-			if i+2 > len(split) {
-				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-			}
-			commands = append(commands, Command{Kind: CmdRPush, Key: split[i+1], Value: split[i+2]})
-			i += 2
-		case "rpop":
-			if i+1 > len(split) {
-				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-			}
-			commands = append(commands, Command{Kind: CmdRPop, Key: split[i+1]})
-			i += 1
-		case "llen":
-			if i+1 > len(split) {
-				return nil, fmt.Errorf("invalid number of arguments for '%s' command", cmd)
-			}
-			commands = append(commands, Command{Kind: CmdLLen, Key: split[i+1]})
-			i += 1
-		default:
-			if cmd == "" {
-				break
-			}
-			return nil, fmt.Errorf("unknown command: '%s'", cmd)
+			qadd.Priority = priority
 		}
-		i++
+		return qadd, nil
+	case "qpop":
+		if argc != 2 {
+			return nil, ErrInvalidNArg(cmd)
+		}
+		return &Command{Kind: CmdQueuePop, Key: split[1]}, nil
+	case "qlen":
+		if argc != 2 {
+			return nil, ErrInvalidNArg(cmd)
+		}
+		return &Command{Kind: CmdQueueLen, Key: split[1]}, nil
+	case "lpush":
+		if argc != 3 {
+			return nil, ErrInvalidNArg(cmd)
+		}
+		return &Command{Kind: CmdLPush, Key: split[1], Value: split[2]}, nil
+	case "lpop":
+		if argc != 2 {
+			return nil, ErrInvalidNArg(cmd)
+		}
+		return &Command{Kind: CmdLPop, Key: split[1]}, nil
+	case "rpush":
+		if argc != 3 {
+			return nil, ErrInvalidNArg(cmd)
+		}
+		return &Command{Kind: CmdRPush, Key: split[1], Value: split[2]}, nil
+	case "rpop":
+		if argc != 2 {
+			return nil, ErrInvalidNArg(cmd)
+		}
+		return &Command{Kind: CmdRPop, Key: split[1]}, nil
+	case "llen":
+		if argc != 2 {
+			return nil, ErrInvalidNArg(cmd)
+		}
+		return &Command{Kind: CmdLLen, Key: split[1]}, nil
 	}
 
-	return commands, nil
+	return nil, ErrUnknownCmd(cmd)
 }
 
 func isWhitespace(b byte) bool {
