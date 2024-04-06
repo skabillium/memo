@@ -17,6 +17,7 @@ func ErrInvalidNArg(cmd string) error {
 }
 
 var ErrNotInt = errors.New("ERR value is not an integer or out of range")
+var ErrUnbalancedQuotes = errors.New("ERR unbalanced quotes")
 
 type CommandType = byte
 
@@ -259,7 +260,7 @@ func sanitize(message string) ([]string, error) {
 			}
 
 			if c != term {
-				return nil, errors.New("unterminated string")
+				return nil, ErrUnbalancedQuotes
 			}
 
 			out = append(out, message[start:i-1])
