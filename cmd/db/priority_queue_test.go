@@ -33,4 +33,21 @@ func TestPriorityQueue(t *testing.T) {
 	if pq.Peek() != "" {
 		t.Error("Expected Peek() to return ''")
 	}
+
+	pq.Enqueue("1", 1)
+	pq.Enqueue("2", 1)
+	pq.Enqueue("3", 1)
+	pq.Enqueue("4", 2)
+	if pq.Dequeue() != "1" {
+		t.Error("Expected Dequeue() to return 1")
+	}
+	if pq.Dequeue() != "2" {
+		t.Error("Expected Dequeue() to return 2")
+	}
+	if pq.Dequeue() != "3" {
+		t.Error("Expected Dequeue() to return 3")
+	}
+	if pq.Dequeue() != "4" {
+		t.Error("Expected Dequeue() to return 4")
+	}
 }

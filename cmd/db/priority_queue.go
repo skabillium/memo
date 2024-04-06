@@ -1,5 +1,7 @@
 package db
 
+import "fmt"
+
 type pqItem struct {
 	priority int
 	data     string
@@ -12,6 +14,12 @@ type PriorityQueue struct {
 
 func NewPriorityQueue() *PriorityQueue {
 	return &PriorityQueue{}
+}
+
+func (p *PriorityQueue) Debug() {
+	for i, v := range p.items {
+		fmt.Printf("%d  { v: %s, p: %d } \n", i, v.data, v.priority)
+	}
 }
 
 func (p *PriorityQueue) Enqueue(data string, priority int) {
@@ -54,13 +62,7 @@ func (p *PriorityQueue) heapifyUp(idx int) {
 	parentPr := p.items[pIdx].priority
 	priority := p.items[idx].priority
 	if parentPr > priority {
-		// Swap values
-		tmp := p.items[pIdx].data
-		p.items[pIdx].priority = priority
-		p.items[pIdx].data = p.items[idx].data
-
-		p.items[idx].priority = parentPr
-		p.items[idx].data = tmp
+		p.swapItems(idx, pIdx)
 		p.heapifyUp(pIdx)
 	}
 }
@@ -83,7 +85,7 @@ func (p *PriorityQueue) heapifyDown(idx int) {
 	if leftPr > rightPr && priority > rightPr {
 		p.swapItems(idx, rIdx)
 		p.heapifyDown(rIdx)
-	} else if rightPr > leftPr && priority > leftPr {
+	} else if rightPr >= leftPr && priority > leftPr {
 		p.swapItems(idx, lIdx)
 		p.heapifyDown(lIdx)
 	}
