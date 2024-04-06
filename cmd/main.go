@@ -79,113 +79,113 @@ func (c *MemoContext) Ok() {
 	c.Simple("OK")
 }
 
-func (s *Server) Execute(cmd *Command) (any, bool) {
+func (s *Server) Execute(cmd *Command) any {
 	switch cmd.Kind {
 	case CmdVersion:
-		return MemoVersion, true
+		return resp.SimpleString(MemoVersion)
 	case CmdPing:
-		return "PONG", true
+		return resp.SimpleString("PONG")
 	case CmdHello:
 		if cmd.RespVersion != CurrentRespVersion {
-			return ErrNoProto, false
+			return ErrNoProto
 		}
-		return s.Info, false
+		return s.Info
 	case CmdInfo:
-		return "Memo server version " + MemoVersion, false
+		return "Memo server version " + MemoVersion
 	case CmdKeys:
 		keys := s.db.Keys(cmd.Pattern)
-		return keys, false
+		return keys
 	case CmdFlushAll:
 		s.db.FlushAll()
-		return "OK", true
+		return resp.SimpleString("OK")
 	case CmdDbSize:
-		return s.db.Size(), false
+		return s.db.Size()
 	case CmdCleanup:
 		deleted := s.db.CleanupExpired()
-		return deleted, false
+		return deleted
 	case CmdExpire:
 		ok := s.db.Expire(cmd.Key, cmd.ExpireIn)
 		if !ok {
-			return 0, false
+			return 0
 		}
-		return 1, false
+		return 1
 	case CmdSet:
 		s.db.Set(cmd.Key, cmd.Value, cmd.ExpireIn)
-		return "OK", true
+		return resp.SimpleString("OK")
 	case CmdGet:
 		value, found, err := s.db.Get(cmd.Key)
 		if err != nil {
-			return err, false
+			return err
 		}
 
 		if !found {
-			return nil, false
+			return nil
 		}
 
-		return value, false
+		return value
 	case CmdList:
-		return errors.New("ERR unsupported command 'list'"), false
+		return errors.New("ERR unsupported command 'list'")
 	case CmdDel:
 		s.db.Del(cmd.Key)
-		return "OK", true
+		return resp.SimpleString("OK")
 	case CmdQueueAdd:
 		s.db.PQAdd(cmd.Key, cmd.Value, cmd.Priority)
-		return 1, false
+		return 1
 	case CmdQueuePop:
 		value, found, err := s.db.PQPop(cmd.Key)
 		if err != nil {
-			return err, false
+			return err
 		}
 
 		if !found {
-			return nil, false
+			return nil
 		}
 
-		return value, false
+		return value
 	case CmdQueueLen:
 		length, found, err := s.db.PQLen(cmd.Key)
 		if err != nil {
-			return err, false
+			return err
 		}
 
 		if !found {
-			return nil, false
+			return nil
 		}
 
-		return length, false
+		return length
 	case CmdLPush:
 		s.db.LPush(cmd.Key, cmd.Values)
-		return len(cmd.Values), false
+		return len(cmd.Values)
 	case CmdRPush:
 		s.db.RPush(cmd.Key, cmd.Values)
-		return len(cmd.Values), false
+		return len(cmd.Values)
 	case CmdLPop:
 		value, found, err := s.db.LPop(cmd.Key)
 		if err != nil {
-			return err, false
+			return err
 		}
 		if !found {
-			return nil, false
+			return nil
 		}
-		return value, false
+		return value
 	case CmdRPop:
 		value, found, err := s.db.RPop(cmd.Key)
 		if err != nil {
-			return err, false
+			return err
 		}
 		if !found {
-			return nil, false
+			return nil
 		}
-		return value, false
+		return value
 	case CmdLLen:
 		length, err := s.db.LLen(cmd.Key)
 		if err != nil {
-			return err, false
+			return err
 		}
-		return length, false
+		return length
 	}
 
-	return nil, false
+	return nil
 }
 
 type ServerInfo struct {
@@ -358,12 +358,8 @@ func (s *Server) handleConnection(conn net.Conn) {
 			s.wal.Write(exec)
 		}
 
-		res, simple := s.Execute(command)
-		if simple {
-			ctx.Simple(res.(string))
-		} else {
-			ctx.Write(res)
-		}
+		res := s.Execute(command)
+		ctx.Write(res)
 		ctx.End()
 	}
 }

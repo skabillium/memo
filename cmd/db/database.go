@@ -81,7 +81,9 @@ func (d *Database) Get(key string) (string, bool, error) {
 
 func (d *Database) Set(key string, value string, expires int) {
 	obj := newValueObj(value)
-	obj.ExpireIn(expires)
+	if expires != 0 {
+		obj.ExpireIn(expires)
+	}
 	d.objs[key] = obj
 }
 

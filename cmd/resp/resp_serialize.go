@@ -8,6 +8,8 @@ import (
 	"strconv"
 )
 
+type SimpleString string
+
 func Serialize(v any) (string, error) {
 	if v == nil {
 		return SerializeNil(), nil
@@ -18,6 +20,9 @@ func Serialize(v any) (string, error) {
 	case reflect.Int:
 		return SerializeInt(v.(int)), nil
 	case reflect.String:
+		if tp == reflect.TypeOf(SimpleString("")) {
+			return SerializeSimpleStr(string(v.(SimpleString))), nil
+		}
 		return SerializeStr(v.(string)), nil
 	case reflect.Struct:
 		stc := reflect.ValueOf(v)
