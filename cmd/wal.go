@@ -1,6 +1,13 @@
+// Utility functions for the Write Ahead Log
+
 package main
 
-import "os"
+import (
+	"os"
+	"skabillium/memo/cmd/resp"
+)
+
+const WalName = "wal.log"
 
 type WAL struct {
 	file *os.File
@@ -15,12 +22,8 @@ func NewWal() (*WAL, error) {
 	return &WAL{file: file}, nil
 }
 
-func (w *WAL) Writeln(line string) error {
-	return w.Write(line + "\n")
-}
-
 func (w *WAL) Write(str string) error {
-	_, err := w.file.WriteString(str)
+	_, err := w.file.WriteString(resp.SerializeStr(str))
 	if err != nil {
 		return err
 	}

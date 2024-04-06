@@ -9,6 +9,7 @@ Run the server with `make build && ./bin/memo`, this should start a memo server 
 - PING
 - HELLO
 - INFO
+- DBSIZE
 - AUTH
 - FLUSHALL
 - KEYS

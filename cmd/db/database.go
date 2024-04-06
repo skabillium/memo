@@ -15,6 +15,10 @@ func NewDatabase() *Database {
 	return &Database{objs: make(map[string]*MemoObj)}
 }
 
+func (d *Database) Size() int {
+	return len(d.objs)
+}
+
 func (d *Database) FlushAll() {
 	d.objs = make(map[string]*MemoObj)
 }

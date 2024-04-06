@@ -21,8 +21,6 @@ const DefaultUser = "memo"
 const DefaultPassword = "password"
 const CurrentRespVersion = "2"
 
-const WalName = "wal.log"
-
 var ErrNoAuth = errors.New("NOAUTH Authentication required")
 var ErrWrongPass = errors.New("WRONGPASS invalid username-password pair or user is disabled")
 var ErrNoProto = errors.New("NOPROTO unsupported protocol version")
@@ -100,6 +98,8 @@ func (s *Server) Execute(cmd *Command) (any, bool) {
 	case CmdFlushAll:
 		s.db.FlushAll()
 		return "OK", true
+	case CmdDbSize:
+		return s.db.Size(), false
 	case CmdCleanup:
 		deleted := s.db.CleanupExpired()
 		return deleted, false
@@ -263,16 +263,29 @@ func (s *Server) BuildDbFromWal() (int, error) {
 	}
 	defer file.Close()
 
-	scanner := bufio.NewScanner(file)
+	rd := bufio.NewReader(file)
 	ops := 0
-	for scanner.Scan() {
-		line := scanner.Text()
-		command, err := ParseCommand(line)
+	for {
+		line, err := resp.Read(rd)
 		if err != nil {
-			return -1, fmt.Errorf("Error while executing command: '%s'", line)
+			if err != io.EOF {
+				return -1, err
+			}
+			break
 		}
 
-		s.Execute(command)
+		exec, ok := line.(string)
+		if !ok {
+			s.db.FlushAll()
+			return -1, errors.New("corrupted wal file, please manually verify that the contents are correct")
+		}
+
+		cmd, err := ParseCommand(exec)
+		if err != nil {
+			return -1, err
+		}
+
+		s.Execute(cmd)
 		ops++
 	}
 
@@ -342,7 +355,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 		}
 
 		if s.walEnabled {
-			s.wal.Writeln(exec)
+			s.wal.Write(exec)
 		}
 
 		res, simple := s.Execute(command)
@@ -475,20 +488,23 @@ func main() {
 		if FileExists(WalName) {
 			ops, err := server.BuildDbFromWal()
 			if err != nil {
-				log.Fatal(err)
+				fmt.Println(err)
+				fmt.Println("Failed to initialize database from WAL")
+			} else {
+				fmt.Printf("Initialized database from %d commands\n", ops)
 			}
 
-			fmt.Printf("Built database from %d commands\n", ops)
 		}
 
 		wal, err := NewWal()
 		if err != nil {
-			// TODO: Handle this differently
 			log.Fatal("Could not initialize wal")
+		} else {
+			defer wal.Close()
+			server.EnableWal(wal)
 		}
-		defer wal.Close()
-		server.EnableWal(wal)
+
 	}
 
-	server.Start()
+	log.Fatal(server.Start())
 }

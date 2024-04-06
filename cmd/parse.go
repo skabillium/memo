@@ -28,6 +28,7 @@ const (
 	CmdAuth
 	CmdHello
 	CmdInfo
+	CmdDbSize
 	CmdFlushAll
 	CmdCleanup
 	CmdExpire
@@ -104,6 +105,11 @@ func ParseCommand(message string) (*Command, error) {
 			return nil, ErrInvalidNArg(cmd)
 		}
 		return &Command{Kind: CmdInfo}, nil
+	case "dbsize":
+		if argc != 1 {
+			return nil, ErrInvalidNArg(cmd)
+		}
+		return &Command{Kind: CmdDbSize}, nil
 	case "flushall":
 		if argc != 1 {
 			return nil, ErrInvalidNArg(cmd)
