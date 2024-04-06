@@ -198,28 +198,22 @@ type ServerInfo struct {
 }
 
 type Server struct {
-	port   string
-	ln     net.Listener
-	quitCh chan struct{}
+	ln      net.Listener
+	quitCh  chan struct{}
+	options *ServerOptions
+	db      *db.Database
+	walch   chan string
 
-	db         *db.Database
-	walEnabled bool
-	wal        *WAL
-
-	// Auth
-	user        string
-	password    string
-	requireAuth bool
 	// Server info
 	connMu sync.Mutex // Mutex to increment connections
 	Info   ServerInfo
 }
 
-func NewServer(port string) *Server {
+func NewServer(options *ServerOptions) *Server {
 	return &Server{
-		port:   port,
-		quitCh: make(chan struct{}),
-		db:     db.NewDatabase(),
+		options: options,
+		quitCh:  make(chan struct{}),
+		db:      db.NewDatabase(),
 		Info: ServerInfo{
 			Server:      "memo",
 			Version:     MemoVersion,
@@ -229,17 +223,6 @@ func NewServer(port string) *Server {
 			Connections: 0,
 		},
 	}
-}
-
-func (s *Server) Auth(user string, password string) {
-	s.requireAuth = true
-	s.user = user
-	s.password = password
-}
-
-func (s *Server) EnableWal(wal *WAL) {
-	s.walEnabled = true
-	s.wal = wal
 }
 
 func (s *Server) newConn() {
@@ -264,8 +247,9 @@ func (s *Server) BuildDbFromWal() (int, error) {
 	defer file.Close()
 
 	rd := bufio.NewReader(file)
-	ops := 0
+	var ops int
 	for {
+		// WAL is serialized as bulk strings
 		line, err := resp.Read(rd)
 		if err != nil {
 			if err != io.EOF {
@@ -293,20 +277,25 @@ func (s *Server) BuildDbFromWal() (int, error) {
 }
 
 func (s *Server) Start() error {
-	ln, err := net.Listen("tcp", "localhost:"+s.port)
+	ln, err := net.Listen("tcp", "localhost:"+s.options.Port)
 	if err != nil {
 		return err
 	}
 	defer ln.Close()
 
-	fmt.Println("Memo server started on port", s.port)
-	if s.walEnabled {
-		fmt.Println("WAL enabled:", WalName)
-	}
-
 	s.ln = ln
 	go s.acceptLoop()
+	if s.options.WalEnabled {
+		s.walch = make(chan string)
+		fmt.Println("WAL enabled:", WalName)
+		go writeToWAL(s.walch)
+	}
+
+	fmt.Println("Memo server started on port", s.options.Port)
+
 	<-s.quitCh
+
+	close(s.walch)
 
 	return nil
 }
@@ -354,8 +343,8 @@ func (s *Server) handleConnection(conn net.Conn) {
 			continue
 		}
 
-		if s.walEnabled {
-			s.wal.Write(exec)
+		if s.options.WalEnabled {
+			s.walch <- exec
 		}
 
 		res := s.Execute(command)
@@ -365,12 +354,12 @@ func (s *Server) handleConnection(conn net.Conn) {
 }
 
 func (s *Server) CanExecute(ctx *MemoContext, command *Command) error {
-	if s.requireAuth && !ctx.hasAuth {
+	if s.options.AuthEnabled && !ctx.hasAuth {
 		if command.Kind != CmdHello && command.Kind != CmdAuth {
 			return ErrNoAuth
 		}
 
-		if !(command.Auth.User == s.user && command.Auth.Password == s.password) {
+		if !(command.Auth.User == s.options.User && command.Auth.Password == s.options.Password) {
 			return ErrWrongPass
 		}
 
@@ -404,11 +393,11 @@ func StringifyRequest(req any) (string, error) {
 }
 
 type ServerOptions struct {
-	Port       string
-	EnableAuth bool
-	EnableWal  bool
-	User       string
-	Password   string
+	Port        string
+	AuthEnabled bool
+	WalEnabled  bool
+	User        string
+	Password    string
 }
 
 func getServerOptions() *ServerOptions {
@@ -458,11 +447,11 @@ func getServerOptions() *ServerOptions {
 	}
 
 	options := &ServerOptions{
-		Port:       port,
-		EnableAuth: !disableAuth,
-		EnableWal:  enableWal,
-		User:       user,
-		Password:   password,
+		Port:        port,
+		AuthEnabled: !disableAuth,
+		WalEnabled:  enableWal,
+		User:        user,
+		Password:    password,
 	}
 
 	return options
@@ -475,31 +464,18 @@ func FileExists(filename string) bool {
 
 func main() {
 	options := getServerOptions()
-	server := NewServer(options.Port)
-	if options.EnableAuth {
-		server.Auth(options.User, options.Password)
-	}
+	server := NewServer(options)
 
-	if options.EnableWal {
+	if options.WalEnabled {
 		if FileExists(WalName) {
 			ops, err := server.BuildDbFromWal()
 			if err != nil {
-				fmt.Println(err)
 				fmt.Println("Failed to initialize database from WAL")
+				fmt.Println(err)
 			} else {
 				fmt.Printf("Initialized database from %d commands\n", ops)
 			}
-
 		}
-
-		wal, err := NewWal()
-		if err != nil {
-			log.Fatal("Could not initialize wal")
-		} else {
-			defer wal.Close()
-			server.EnableWal(wal)
-		}
-
 	}
 
 	log.Fatal(server.Start())
