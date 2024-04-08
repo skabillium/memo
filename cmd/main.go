@@ -13,6 +13,7 @@ import (
 	"skabillium/memo/cmd/resp"
 	"strings"
 	"sync"
+	"time"
 )
 
 const MemoVersion = "0.0.1"
@@ -21,6 +22,8 @@ const DefaultPort = "5678"
 const DefaultUser = "memo"
 const DefaultPassword = "password"
 const CurrentRespVersion = "2"
+
+const DefaultCleanupLimit = 20
 
 var ErrNoAuth = errors.New("NOAUTH Authentication required")
 var ErrWrongPass = errors.New("WRONGPASS invalid username-password pair or user is disabled")
@@ -102,8 +105,7 @@ func (s *Server) Execute(cmd *Command) any {
 	case CmdDbSize:
 		return s.db.Size()
 	case CmdCleanup:
-		deleted := s.db.CleanupExpired()
-		return deleted
+		return s.db.CleanupExpired(cmd.Limit)
 	case CmdExpire:
 		ok := s.db.Expire(cmd.Key, cmd.ExpireIn)
 		if !ok {
@@ -324,6 +326,12 @@ func (s *Server) Start() error {
 
 	s.ln = ln
 	go s.acceptLoop()
+
+	if s.options.AutoCleanupEnabled {
+		go s.runExpireJob()
+		fmt.Println("Started auto cleanup job")
+	}
+
 	if s.options.WalEnabled {
 		s.walch = make(chan string)
 		fmt.Println("WAL enabled:", WalName)
@@ -436,30 +444,49 @@ func StringifyRequest(req any) (string, error) {
 	return exec, nil
 }
 
+func (s *Server) runExpireJob() {
+	// Remove expired keys every second
+	ticker := time.NewTicker(s.options.CleanupInterval)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		s.db.CleanupExpired(s.options.CleanupLimit)
+	}
+}
+
 type ServerOptions struct {
-	Port        string
-	AuthEnabled bool
-	WalEnabled  bool
-	User        string
-	Password    string
+	Port               string
+	AuthEnabled        bool
+	WalEnabled         bool
+	AutoCleanupEnabled bool
+	CleanupLimit       int
+	CleanupInterval    time.Duration
+	User               string
+	Password           string
 }
 
 func getServerOptions() *ServerOptions {
 	var (
-		port        string
-		portSr      string
-		disableAuth bool
-		enableWal   bool
-		user        string
-		userSr      string
-		password    string
-		passwordSr  string
+		port            string
+		portSr          string
+		disableAuth     bool
+		enableWal       bool
+		disableCleanup  bool
+		cleanupLimit    int
+		cleanupInterval int
+		user            string
+		userSr          string
+		password        string
+		passwordSr      string
 	)
 
 	flag.StringVar(&port, "port", "", "Port to run server")
 	flag.StringVar(&portSr, "p", "", "Shorthand for port")
 	flag.BoolVar(&disableAuth, "noauth", false, "Disable authentication")
 	flag.BoolVar(&enableWal, "wal", false, "Enable write ahead log authentication")
+	flag.BoolVar(&disableCleanup, "nocleanup", false, "Disable auto cleanup")
+	flag.IntVar(&cleanupLimit, "cleanup-limit", 0, "Cleanup limit")
+	flag.IntVar(&cleanupInterval, "cleanup-interval", 1, "Cleanup interval in seconds")
 	flag.StringVar(&user, "user", "", "User for authentication")
 	flag.StringVar(&userSr, "u", "", "Shorthand for user")
 	flag.StringVar(&password, "password", "", "Password for authentication")
@@ -490,12 +517,19 @@ func getServerOptions() *ServerOptions {
 		}
 	}
 
+	if cleanupLimit == 0 {
+		cleanupLimit = DefaultCleanupLimit
+	}
+
 	options := &ServerOptions{
-		Port:        port,
-		AuthEnabled: !disableAuth,
-		WalEnabled:  enableWal,
-		User:        user,
-		Password:    password,
+		Port:               port,
+		AuthEnabled:        !disableAuth,
+		WalEnabled:         enableWal,
+		AutoCleanupEnabled: !disableCleanup,
+		CleanupLimit:       cleanupLimit,
+		CleanupInterval:    time.Duration(cleanupInterval) * time.Second,
+		User:               user,
+		Password:           password,
 	}
 
 	return options

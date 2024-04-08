@@ -23,12 +23,16 @@ func (d *Database) FlushAll() {
 	d.objs = make(map[string]*MemoObj)
 }
 
-func (d *Database) CleanupExpired() int {
+func (d *Database) CleanupExpired(limit int) int {
 	deleted := 0
 	for k, obj := range d.objs {
 		if obj.hasExpired() {
 			delete(d.objs, k)
 			deleted++
+		}
+
+		if limit != 0 && deleted == limit {
+			break
 		}
 	}
 

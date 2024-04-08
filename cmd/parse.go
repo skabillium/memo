@@ -74,6 +74,7 @@ type Command struct {
 	Priority    int         // pqadd
 	Auth        AuthOptions // hello
 	RespVersion string      // hello
+	Limit       int
 }
 
 func ParseCommand(message string) (*Command, error) {
@@ -125,10 +126,17 @@ func ParseCommand(message string) (*Command, error) {
 		}
 		return &Command{Kind: CmdFlushAll}, nil
 	case "cleanup":
-		if argc != 1 {
-			return nil, ErrInvalidNArg(cmd)
+		cleanup := &Command{Kind: CmdCleanup}
+		if argc == 2 {
+			limit, err := strconv.Atoi(split[1])
+			if err != nil {
+				return nil, ErrNotInt
+			}
+
+			cleanup.Limit = limit
 		}
-		return &Command{Kind: CmdCleanup}, nil
+
+		return cleanup, nil
 	case "expire":
 		if argc != 3 {
 			return nil, ErrInvalidNArg(cmd)
