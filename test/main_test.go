@@ -1,6 +1,7 @@
 package main
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -153,7 +154,7 @@ func TestQueue(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if length != 1 {
+	if length.(int64) != 1 {
 		t.Error("Expected length to be 1, got", length)
 	}
 
@@ -163,5 +164,64 @@ func TestQueue(t *testing.T) {
 	}
 	if john != "john" {
 		t.Error("Expected item to be 'john', got", john)
+	}
+}
+
+func TestSet(t *testing.T) {
+	memo := GetClient()
+	defer memo.FlushAll(ctx)
+
+	heroes := "heroes"
+	marvel := "marvel"
+
+	memo.SAdd(ctx, heroes, "superman", "batman", "wonder woman", "spiderman", "iron man")
+	memo.SAdd(ctx, marvel, "spiderman", "iron man", "nick fury")
+
+	heroesSize, err := memo.SCard(ctx, heroes).Result()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if heroesSize != 5 {
+		t.Error("Expected heroes cardinality to be 5, got", heroesSize)
+	}
+
+	ismem, err := memo.SIsMember(ctx, heroes, "batman").Result()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !ismem {
+		t.Error("Expected 'batman' to be member of heroes")
+	}
+
+	ismem, err = memo.SIsMember(ctx, heroes, "nick fury").Result()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if ismem {
+		t.Error("Expected 'nick fury' to not be member of heroes")
+	}
+
+	inter, err := memo.SInter(ctx, heroes, marvel).Result()
+	if err != nil {
+		t.Error(err)
+	}
+
+	marvelHeroes := []string{"spiderman", "iron man"}
+	if !reflect.DeepEqual(inter, marvelHeroes) {
+		t.Error("Expected inter to be", marvelHeroes, "got", inter)
+	}
+
+	memo.SRem(ctx, heroes, "spiderman")
+
+	heroesSize, err = memo.SCard(ctx, heroes).Result()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if heroesSize != 4 {
+		t.Error("Expected heroes cardinality to be 4, got", heroesSize)
 	}
 }
