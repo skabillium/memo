@@ -237,6 +237,124 @@ func (d *Database) LLen(lname string) (int, error) {
 	return list.Length, nil
 }
 
+func (d *Database) SetAdd(key string, values []string) (int, error) {
+	obj, found := d.getObj(key)
+	if !found {
+		obj = newSetObj()
+	}
+
+	set, ok := obj.asSet()
+	if !ok {
+		return -1, ErrWrongType
+	}
+
+	for i := 0; i < len(values); i++ {
+		set.Add(values[i])
+	}
+
+	if !found {
+		d.objs[key] = obj
+	}
+
+	return len(values), nil
+}
+
+func (d *Database) SetMembers(key string) ([]string, error) {
+	obj, found := d.getObj(key)
+	if !found {
+		obj = newSetObj()
+	}
+
+	set, ok := obj.asSet()
+	if !ok {
+		return nil, ErrWrongType
+	}
+
+	return set.Items(), nil
+}
+
+func (d *Database) SetRemove(key string, values []string) (int, error) {
+	obj, found := d.getObj(key)
+	if !found {
+		return 0, nil
+	}
+
+	set, ok := obj.asSet()
+	if !ok {
+		return -1, ErrWrongType
+	}
+
+	var total int
+	for i := 0; i < len(values); i++ {
+		removed := set.Delete(values[i])
+		if removed {
+			total++
+		}
+	}
+
+	return total, nil
+}
+
+func (d *Database) SetIsMember(key string, value string) (bool, error) {
+	obj, found := d.getObj(key)
+	if !found {
+		return false, nil
+	}
+
+	set, ok := obj.asSet()
+	if !ok {
+		return false, ErrWrongType
+	}
+
+	return set.Has(value), nil
+}
+
+func (d *Database) SetCard(key string) (int, error) {
+	obj, found := d.getObj(key)
+	if !found {
+		return 0, nil
+	}
+
+	set, ok := obj.asSet()
+	if !ok {
+		return -1, ErrWrongType
+	}
+
+	return set.Size, nil
+}
+
+func (d *Database) SetInter(a string, b string) ([]string, error) {
+	first, found := d.getObj(a)
+	if !found {
+		return nil, nil
+	}
+
+	second, found := d.getObj(b)
+	if !found {
+		return nil, nil
+	}
+
+	set1, ok := first.asSet()
+	if !ok {
+		return nil, ErrWrongType
+	}
+
+	set2, ok := second.asSet()
+	if !ok {
+		return nil, ErrWrongType
+	}
+
+	firstKeys := set1.Items()
+	inter := []string{}
+	for _, k := range firstKeys {
+		if set2.Has(k) {
+			inter = append(inter, k)
+		}
+	}
+
+	return inter, nil
+}
+
 func (d *Database) getObj(key string) (*MemoObj, bool) {
 	obj, found := d.objs[key]
 	if !found {

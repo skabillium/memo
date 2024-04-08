@@ -8,6 +8,7 @@ const (
 	ObjValue MemoObjType = iota
 	ObjPQueue
 	ObjList
+	ObjSet
 )
 
 type MemoObj struct {
@@ -16,6 +17,7 @@ type MemoObj struct {
 	ExpiresAt int64
 	PQueue    *PriorityQueue
 	List      *List
+	Set       *Set
 }
 
 func newValueObj(value string) *MemoObj {
@@ -30,6 +32,10 @@ func newListObj() *MemoObj {
 	return &MemoObj{Kind: ObjList, List: NewList()}
 }
 
+func newSetObj() *MemoObj {
+	return &MemoObj{Kind: ObjSet, Set: NewSet()}
+}
+
 func (obj *MemoObj) asValue() (string, bool) {
 	return obj.Value, obj.Kind == ObjValue
 }
@@ -40,6 +46,10 @@ func (obj *MemoObj) asPQueue() (*PriorityQueue, bool) {
 
 func (obj *MemoObj) asList() (*List, bool) {
 	return obj.List, obj.Kind == ObjList
+}
+
+func (obj *MemoObj) asSet() (*Set, bool) {
+	return obj.Set, obj.Kind == ObjSet
 }
 
 // Set expiration for object in seconds

@@ -48,6 +48,13 @@ const (
 	CmdRPush
 	CmdRPop
 	CmdLLen
+	// Sets
+	CmdSetAdd
+	CmdSetMembers
+	CmdSetRem
+	CmdSetIsMember
+	CmdSetInter
+	CmdSetCard
 )
 
 type AuthOptions struct {
@@ -58,6 +65,7 @@ type AuthOptions struct {
 type Command struct {
 	Kind   CommandType
 	Key    string
+	Keys   []string
 	Value  string
 	Values []string
 
@@ -228,6 +236,36 @@ func ParseCommand(message string) (*Command, error) {
 			return nil, ErrInvalidNArg(cmd)
 		}
 		return &Command{Kind: CmdLLen, Key: split[1]}, nil
+	case "sadd":
+		if argc < 3 {
+			return nil, ErrInvalidNArg(cmd)
+		}
+		return &Command{Kind: CmdSetAdd, Key: split[1], Values: split[2:]}, nil
+	case "smembers":
+		if argc != 2 {
+			return nil, ErrInvalidNArg(cmd)
+		}
+		return &Command{Kind: CmdSetMembers, Key: split[1]}, nil
+	case "srem":
+		if argc < 3 {
+			return nil, ErrInvalidNArg(cmd)
+		}
+		return &Command{Kind: CmdSetRem, Key: split[1], Values: split[2:]}, nil
+	case "sismember":
+		if argc != 3 {
+			return nil, ErrInvalidNArg(cmd)
+		}
+		return &Command{Kind: CmdSetIsMember, Key: split[1], Value: split[2]}, nil
+	case "scard":
+		if argc != 2 {
+			return nil, ErrInvalidNArg(cmd)
+		}
+		return &Command{Kind: CmdSetCard, Key: split[1]}, nil
+	case "sinter":
+		if argc != 3 {
+			return nil, ErrInvalidNArg(cmd)
+		}
+		return &Command{Kind: CmdSetInter, Keys: []string{split[1], split[2]}}, nil
 	}
 
 	return nil, ErrUnknownCmd(cmd)

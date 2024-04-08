@@ -40,6 +40,14 @@ func TestSerialize(t *testing.T) {
 	if r, err := Serialize(err); r != "-custom error\r\n" || err != nil {
 		t.Error("Expected other result for Serialize(err)")
 	}
+
+	if r, err := Serialize(true); r != "#t\r\n" || err != nil {
+		t.Error("Expected other result for Serialize(true)")
+	}
+
+	if r, err := Serialize(false); r != "#f\r\n" || err != nil {
+		t.Error("Expected other result for Serialize(true)")
+	}
 }
 
 func TestSerializeSimple(t *testing.T) {

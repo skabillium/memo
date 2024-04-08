@@ -17,6 +17,8 @@ func Serialize(v any) (string, error) {
 
 	tp := reflect.TypeOf(v)
 	switch tp.Kind() {
+	case reflect.Bool:
+		return SerializeBool(v.(bool)), nil
 	case reflect.Int:
 		return SerializeInt(v.(int)), nil
 	case reflect.String:
@@ -84,6 +86,17 @@ func Serialize(v any) (string, error) {
 
 func SerializeNil() string {
 	return "$-1\r\n"
+}
+
+func SerializeBool(b bool) string {
+	out := "#"
+	if b {
+		out += "t"
+	} else {
+		out += "f"
+	}
+	out += "\r\n"
+	return out
 }
 
 func SerializeSimpleStr(str string) string {

@@ -183,6 +183,44 @@ func (s *Server) Execute(cmd *Command) any {
 			return err
 		}
 		return length
+	case CmdSetAdd:
+		added, err := s.db.SetAdd(cmd.Key, cmd.Values)
+		if err != nil {
+			return err
+		}
+
+		return added
+	case CmdSetMembers:
+		members, err := s.db.SetMembers(cmd.Key)
+		if err != nil {
+			return err
+		}
+
+		return members
+	case CmdSetRem:
+		removed, err := s.db.SetRemove(cmd.Key, cmd.Values)
+		if err != nil {
+			return err
+		}
+		return removed
+	case CmdSetIsMember:
+		ismember, err := s.db.SetIsMember(cmd.Key, cmd.Value)
+		if err != nil {
+			return err
+		}
+		return ismember
+	case CmdSetCard:
+		size, err := s.db.SetCard(cmd.Key)
+		if err != nil {
+			return err
+		}
+		return size
+	case CmdSetInter:
+		inter, err := s.db.SetInter(cmd.Keys[0], cmd.Keys[1])
+		if err != nil {
+			return err
+		}
+		return inter
 	}
 
 	return nil
