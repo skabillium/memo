@@ -61,7 +61,7 @@ func (d *Database) Expire(key string, seconds int) bool {
 		return found
 	}
 	if seconds <= 0 {
-		d.Del(key)
+		d.remove(key)
 		return true
 	}
 
@@ -91,8 +91,14 @@ func (d *Database) Set(key string, value string, expires int) {
 	d.objs[key] = obj
 }
 
-func (d *Database) Del(key string) {
-	delete(d.objs, key)
+func (d *Database) Del(keys []string) int {
+	var deleted int
+	for _, k := range keys {
+		delete(d.objs, k)
+		deleted++
+	}
+
+	return deleted
 }
 
 func (d *Database) PQAdd(qname string, value string, priority int) error {
@@ -127,7 +133,7 @@ func (d *Database) PQPop(qname string) (string, bool, error) {
 
 	value := pqueue.Dequeue()
 	if pqueue.Length == 0 {
-		d.Del(qname)
+		d.remove(qname)
 	}
 
 	return value, found, nil
@@ -202,7 +208,7 @@ func (d *Database) LPop(lname string) (string, bool, error) {
 
 	value := list.PopHead()
 	if list.Length == 0 {
-		d.Del(lname)
+		d.remove(lname)
 	}
 
 	return value, found, nil
@@ -221,7 +227,7 @@ func (d *Database) RPop(lname string) (string, bool, error) {
 
 	value := list.PopTail()
 	if obj.List.Length == 0 {
-		d.Del(lname)
+		d.remove(lname)
 	}
 
 	return value, found, nil
@@ -366,9 +372,13 @@ func (d *Database) getObj(key string) (*MemoObj, bool) {
 	}
 
 	if obj.hasExpired() {
-		d.Del(key)
+		d.remove(key)
 		return nil, false
 	}
 
 	return obj, true
+}
+
+func (d *Database) remove(key string) {
+	delete(d.objs, key)
 }

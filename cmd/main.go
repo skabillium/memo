@@ -129,8 +129,7 @@ func (s *Server) Execute(cmd *Command) any {
 	case CmdList:
 		return errors.New("ERR unsupported command 'list'")
 	case CmdDel:
-		s.db.Del(cmd.Key)
-		return resp.SimpleString("OK")
+		return s.db.Del(cmd.Keys)
 	case CmdQueueAdd:
 		s.db.PQAdd(cmd.Key, cmd.Value, cmd.Priority)
 		return 1

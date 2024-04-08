@@ -188,10 +188,10 @@ func ParseCommand(message string) (*Command, error) {
 		}
 		return &Command{Kind: CmdGet, Key: split[1]}, nil
 	case "del":
-		if argc != 2 {
+		if argc < 2 {
 			return nil, ErrInvalidNArg(cmd)
 		}
-		return &Command{Kind: CmdDel, Key: split[1]}, nil
+		return &Command{Kind: CmdDel, Keys: split[1:]}, nil
 	case "qadd":
 		if argc < 3 {
 			return nil, ErrInvalidNArg(cmd)
