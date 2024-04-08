@@ -74,12 +74,7 @@ func readString(r *bufio.Reader, line string) (string, error) {
 		return "", err
 	}
 
-	str := string(b[:n])
-	if strings.Contains(str, " ") {
-		str = "\"" + str + "\""
-	}
-
-	return str, nil
+	return string(b[:n]), nil
 }
 
 func readSlice(r *bufio.Reader, line string) ([]any, error) {

@@ -11,6 +11,7 @@ import (
 	"os"
 	"skabillium/memo/cmd/db"
 	"skabillium/memo/cmd/resp"
+	"strings"
 	"sync"
 )
 
@@ -421,6 +422,11 @@ func StringifyRequest(req any) (string, error) {
 			if i != 0 {
 				exec += " "
 			}
+
+			if strings.Contains(s, " ") {
+				s = "\"" + s + "\""
+			}
+
 			exec += s
 		}
 	default:

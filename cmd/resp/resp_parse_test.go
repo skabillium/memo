@@ -63,13 +63,6 @@ func TestParseBulkString(t *testing.T) {
 	if err != nil || v != "hello" {
 		t.Error("Expected result to be 'hello'")
 	}
-
-	str = "$12\r\nhello there!\r\n"
-	r = bufio.NewReader(strings.NewReader(str))
-	v, err = Read(r)
-	if err != nil || v != "\"hello there!\"" {
-		t.Error("Expected result to be '\"hello there!\"'")
-	}
 }
 
 func TestParseError(t *testing.T) {
