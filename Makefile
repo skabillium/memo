@@ -1,4 +1,5 @@
 CMD = ./cmd
+TEST = ./test
 BIN = ./bin/memo
 
 clean:
@@ -8,6 +9,9 @@ test:
 	go test ${CMD}/db
 	go test ${CMD}/resp
 	go test ${CMD}
+
+testsuite:
+	go test ${TEST}
 
 dev:
 	go run ${CMD} --noauth
