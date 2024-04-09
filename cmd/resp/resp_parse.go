@@ -39,6 +39,10 @@ func Read(r *bufio.Reader) (any, error) {
 
 	line := strings.Trim(l, "\r\n")
 
+	if line == "" {
+		return line, nil
+	}
+
 	switch line[0] {
 	case RespNil:
 		return nil, nil
