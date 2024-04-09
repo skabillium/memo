@@ -5,12 +5,12 @@ BIN = ./bin/memo
 clean:
 	rm -rf ./bin
 
-test:
+tests:
 	go test ${CMD}/db
 	go test ${CMD}/resp
 	go test ${CMD}
 
-testsuite:
+integ:
 	go test ${TEST}
 
 dev:
