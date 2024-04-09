@@ -123,7 +123,7 @@ func TestQueue(t *testing.T) {
 	queue := "names"
 	memo.Do(ctx, "qadd", queue, "bill")
 	memo.Do(ctx, "qadd", queue, "susan")
-	memo.Do(ctx, "qadd", queue, "kirk", "2")
+	memo.Do(ctx, "qadd", queue, "kirk", "pr", "2")
 
 	// We need "james" and "susan" to be inserted at different millis
 	time.Sleep(2 * time.Millisecond)

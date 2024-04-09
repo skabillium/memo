@@ -196,13 +196,20 @@ func ParseCommand(message string) (*Command, error) {
 		if argc < 3 {
 			return nil, ErrInvalidNArg(cmd)
 		}
-		qadd := &Command{Kind: CmdQueueAdd, Key: split[1], Value: split[2], Priority: 1}
-		if argc == 4 {
-			priority, err := strconv.Atoi(split[3])
-			if err != nil {
-				return nil, ErrNotInt
+		qadd := &Command{Kind: CmdQueueAdd, Key: split[1], Priority: 1}
+
+		for i := 2; i < argc; i++ {
+			if i+1 < argc && strings.ToLower(split[i]) == "pr" {
+				priority, err := strconv.Atoi(split[i+1])
+				if err != nil {
+					return nil, ErrNotInt
+				}
+
+				qadd.Priority = priority
+				i++
+				continue
 			}
-			qadd.Priority = priority
+			qadd.Values = append(qadd.Values, split[i])
 		}
 		return qadd, nil
 	case "qpop":

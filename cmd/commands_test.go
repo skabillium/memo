@@ -38,3 +38,33 @@ func TestParse(t *testing.T) {
 		t.Error("Expected result to be:", cmd, "got", res)
 	}
 }
+
+func TestParseQueueCommands(t *testing.T) {
+	var str string
+	var cmd, res *Command
+
+	str = "qadd queue 1"
+	cmd = &Command{Kind: CmdQueueAdd, Key: "queue", Values: []string{"1"}, Priority: 1}
+	res, _ = ParseCommand(str)
+	if !reflect.DeepEqual(cmd, res) {
+		t.Error("Expected result to be:", cmd, "got", res)
+	}
+	str = "qadd queue 1 pr 2"
+	cmd = &Command{Kind: CmdQueueAdd, Key: "queue", Values: []string{"1"}, Priority: 2}
+	res, _ = ParseCommand(str)
+	if !reflect.DeepEqual(cmd, res) {
+		t.Error("Expected result to be:", cmd, "got", res)
+	}
+	str = "qadd queue 1 2 3"
+	cmd = &Command{Kind: CmdQueueAdd, Key: "queue", Values: []string{"1", "2", "3"}, Priority: 1}
+	res, _ = ParseCommand(str)
+	if !reflect.DeepEqual(cmd, res) {
+		t.Error("Expected result to be:", cmd, "got", res)
+	}
+	str = "qadd queue 1 2 3 pr 2"
+	cmd = &Command{Kind: CmdQueueAdd, Key: "queue", Values: []string{"1", "2", "3"}, Priority: 2}
+	res, _ = ParseCommand(str)
+	if !reflect.DeepEqual(cmd, res) {
+		t.Error("Expected result to be:", cmd, "got", res)
+	}
+}

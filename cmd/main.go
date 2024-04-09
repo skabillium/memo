@@ -113,7 +113,7 @@ func (s *Server) Execute(cmd *Command) any {
 	case CmdDel:
 		return s.db.Del(cmd.Keys)
 	case CmdQueueAdd:
-		s.db.PQAdd(cmd.Key, cmd.Value, cmd.Priority)
+		s.db.PQAdd(cmd.Key, cmd.Values, cmd.Priority)
 		return 1
 	case CmdQueuePop:
 		value, found, err := s.db.PQPop(cmd.Key)

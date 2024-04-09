@@ -101,7 +101,7 @@ func (d *Database) Del(keys []string) int {
 	return deleted
 }
 
-func (d *Database) PQAdd(qname string, value string, priority int) error {
+func (d *Database) PQAdd(qname string, values []string, priority int) error {
 	obj, found := d.getObj(qname)
 	if !found {
 		obj = newPQueueObj()
@@ -112,7 +112,10 @@ func (d *Database) PQAdd(qname string, value string, priority int) error {
 		return ErrWrongType
 	}
 
-	pqueue.Enqueue(value, priority)
+	for i := 0; i < len(values); i++ {
+		pqueue.Enqueue(values[i], priority)
+	}
+
 	if !found {
 		d.objs[qname] = obj
 	}
