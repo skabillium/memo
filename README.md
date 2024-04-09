@@ -1,7 +1,7 @@
 # Memo
 
-Memo is a Redis-like in-memory database implemented in go. Other than basic key-value functionalities
-it supports additional data structures like priority queues, FIFO queues and stacks.
+Memo is a Redis-compliant in-memory database implemented in go. Other than basic key-value 
+functionalities it also supports lists, priority queues and sets.
 
 Run the server with `make build && ./bin/memo`, this should start a memo server on `localhost:5678`
 
@@ -37,3 +37,13 @@ with the following commands:
 - QADD: Add elements to a queue
 - QPOP: Remove elements from a queue
 - QLEN: Get number of queued elements
+
+## Running the test suite
+To run the unit test suite for the database internals run `make tests`. If you instead want to run
+the integration test suit run the following commands:
+```sh
+make build
+./bin/memo -noauth # Start server without authentication
+
+make integ # Run integration test suite
+```
