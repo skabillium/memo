@@ -22,6 +22,11 @@ Run the server with `make build && ./bin/memo`, this should start a memo server 
 - RPUSH
 - RPOP
 - LLEN
+- SADD
+- SISMEMBER
+- SREM
+- SCARD
+- SINTER
 
 ### Additional commands not supported by Redis
 - VERSION: Prints the version of the server
