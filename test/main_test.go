@@ -123,47 +123,35 @@ func TestQueue(t *testing.T) {
 	queue := "names"
 	memo.Do(ctx, "qadd", queue, "bill")
 	memo.Do(ctx, "qadd", queue, "susan")
-	memo.Do(ctx, "qadd", queue, "john", "2")
+	memo.Do(ctx, "qadd", queue, "kirk", "2")
+
+	// We need "james" and "susan" to be inserted at different millis
+	time.Sleep(2 * time.Millisecond)
 	memo.Do(ctx, "qadd", queue, "james")
 
-	bill, err := memo.Do(ctx, "qpop", queue).Result()
-	if err != nil {
-		t.Error(err)
-	}
-	if bill != "bill" {
-		t.Error("Expected item to be 'bill', got", bill)
+	pop, _ := memo.Do(ctx, "qpop", queue).Result()
+	if pop != "bill" {
+		t.Error("Expected item to be 'bill', got", pop)
 	}
 
-	susan, err := memo.Do(ctx, "qpop", queue).Result()
-	if err != nil {
-		t.Error(err)
-	}
-	if susan != "susan" {
-		t.Error("Expected item to be 'susan', got", susan)
+	pop, _ = memo.Do(ctx, "qpop", queue).Result()
+	if pop != "susan" {
+		t.Error("Expected item to be 'susan', got", pop)
 	}
 
-	james, err := memo.Do(ctx, "qpop", queue).Result()
-	if err != nil {
-		t.Error(err)
-	}
-	if james != "james" {
-		t.Error("Expected item to be 'james', got", james)
+	pop, _ = memo.Do(ctx, "qpop", queue).Result()
+	if pop != "james" {
+		t.Error("Expected item to be 'james', got", pop)
 	}
 
-	length, err := memo.Do(ctx, "qlen", queue).Result()
-	if err != nil {
-		t.Error(err)
-	}
+	length, _ := memo.Do(ctx, "qlen", queue).Result()
 	if length.(int64) != 1 {
 		t.Error("Expected length to be 1, got", length)
 	}
 
-	john, err := memo.Do(ctx, "qpop", queue).Result()
-	if err != nil {
-		t.Error(err)
-	}
-	if john != "john" {
-		t.Error("Expected item to be 'john', got", john)
+	pop, _ = memo.Do(ctx, "qpop", queue).Result()
+	if pop != "kirk" {
+		t.Error("Expected item to be 'kirk', got", pop)
 	}
 }
 
