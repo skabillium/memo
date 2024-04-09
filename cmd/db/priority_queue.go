@@ -1,10 +1,26 @@
 package db
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 type pqItem struct {
-	priority int
-	data     string
+	priority   int
+	insertedAt int64
+	data       string
+}
+
+func newPqItem(data string, priority int) pqItem {
+	return pqItem{data: data, priority: priority, insertedAt: time.Now().Unix()}
+}
+
+func (item *pqItem) isLowerThan(other pqItem) bool {
+	return item.priority < other.priority || item.insertedAt < other.insertedAt
+}
+
+func (item *pqItem) isHigherThan(other pqItem) bool {
+	return item.priority >= other.priority || item.insertedAt >= other.insertedAt
 }
 
 type PriorityQueue struct {
@@ -23,7 +39,7 @@ func (p *PriorityQueue) Debug() {
 }
 
 func (p *PriorityQueue) Enqueue(data string, priority int) {
-	p.items = append(p.items, pqItem{priority: priority, data: data})
+	p.items = append(p.items, newPqItem(data, priority))
 	p.heapifyUp(p.Length)
 	p.Length++
 }
@@ -59,9 +75,9 @@ func (p *PriorityQueue) heapifyUp(idx int) {
 	}
 
 	pIdx := p.parent(idx)
-	parentPr := p.items[pIdx].priority
-	priority := p.items[idx].priority
-	if parentPr > priority {
+	parent := p.items[pIdx]
+	current := p.items[idx]
+	if current.isLowerThan(parent) {
 		p.swapItems(idx, pIdx)
 		p.heapifyUp(pIdx)
 	}
@@ -78,27 +94,38 @@ func (p *PriorityQueue) heapifyDown(idx int) {
 		return
 	}
 
-	priority := p.items[idx].priority
-	leftPr := p.items[lIdx].priority
-	rightPr := p.items[rIdx].priority
+	// priority := p.items[idx].priority
+	// leftPr := p.items[lIdx].priority
+	// rightPr := p.items[rIdx].priority
 
-	if leftPr > rightPr && priority > rightPr {
+	current := p.items[idx]
+	left := p.items[lIdx]
+	right := p.items[rIdx]
+
+	if right.isLowerThan(left) && right.isLowerThan(current) {
 		p.swapItems(idx, rIdx)
 		p.heapifyDown(rIdx)
-	} else if rightPr >= leftPr && priority > leftPr {
+	} else if right.isHigherThan(left) && left.isLowerThan(current) {
 		p.swapItems(idx, lIdx)
 		p.heapifyDown(lIdx)
 	}
 }
 
 func (p *PriorityQueue) swapItems(i int, j int) {
+	p.items[i], p.items[j] = p.items[j], p.items[i]
+	return
+
 	tmpd := p.items[i].data
 	tmpp := p.items[i].priority
+	tmpi := p.items[i].insertedAt
 
 	p.items[i].data = p.items[j].data
 	p.items[i].priority = p.items[j].priority
+	p.items[i].insertedAt = p.items[j].insertedAt
+
 	p.items[j].data = tmpd
 	p.items[j].priority = tmpp
+	p.items[j].insertedAt = tmpi
 }
 
 func (p *PriorityQueue) parent(idx int) int {

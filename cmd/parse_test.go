@@ -31,5 +31,10 @@ func TestSanitize(t *testing.T) {
 }
 
 func TestParse(t *testing.T) {
-
+	str := "set name bill"
+	cmd := &Command{Kind: CmdSet, Key: "name", Value: "bill"}
+	res, _ := ParseCommand(str)
+	if !reflect.DeepEqual(cmd, res) {
+		t.Error("Expected result to be:", cmd, "got", res)
+	}
 }
