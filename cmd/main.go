@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -11,7 +10,6 @@ import (
 	"os"
 	"skabillium/memo/cmd/db"
 	"skabillium/memo/cmd/resp"
-	"strings"
 	"sync"
 	"time"
 )
@@ -58,10 +56,6 @@ func (c *MemoContext) Write(message any) {
 	c.rw.WriteString(payload)
 }
 
-func (c *MemoContext) Readline() (string, error) {
-	return c.rw.ReadString('\n')
-}
-
 func (c *MemoContext) EndWith(message any) {
 	c.Write(message)
 	c.End()
@@ -69,18 +63,6 @@ func (c *MemoContext) EndWith(message any) {
 
 func (c *MemoContext) End() {
 	c.rw.Flush()
-}
-
-func (c *MemoContext) Error(err error) {
-	c.Write(err)
-}
-
-func (c *MemoContext) Simple(message string) {
-	c.rw.WriteString(resp.SerializeSimpleStr(message))
-}
-
-func (c *MemoContext) Ok() {
-	c.Simple("OK")
 }
 
 func (s *Server) Execute(cmd *Command) any {
@@ -415,34 +397,6 @@ func (s *Server) CanExecute(ctx *MemoContext, command *Command) error {
 	return nil
 }
 
-func StringifyRequest(req any) (string, error) {
-	var exec string
-	switch req := req.(type) {
-	case string:
-		exec = req
-	case []any:
-		for i, v := range req {
-			s, ok := v.(string)
-			if !ok {
-				return "", ErrUnsupportedType
-			}
-			if i != 0 {
-				exec += " "
-			}
-
-			if strings.Contains(s, " ") {
-				s = "\"" + s + "\""
-			}
-
-			exec += s
-		}
-	default:
-		return "", ErrUnsupportedType
-	}
-
-	return exec, nil
-}
-
 func (s *Server) runExpireJob() {
 	// Remove expired keys every second
 	ticker := time.NewTicker(s.options.CleanupInterval)
@@ -451,92 +405,6 @@ func (s *Server) runExpireJob() {
 	for range ticker.C {
 		s.db.CleanupExpired(s.options.CleanupLimit)
 	}
-}
-
-type ServerOptions struct {
-	Port               string
-	AuthEnabled        bool
-	WalEnabled         bool
-	AutoCleanupEnabled bool
-	CleanupLimit       int
-	CleanupInterval    time.Duration
-	User               string
-	Password           string
-}
-
-func getServerOptions() *ServerOptions {
-	var (
-		port            string
-		portSr          string
-		disableAuth     bool
-		enableWal       bool
-		disableCleanup  bool
-		cleanupLimit    int
-		cleanupInterval int
-		user            string
-		userSr          string
-		password        string
-		passwordSr      string
-	)
-
-	flag.StringVar(&port, "port", "", "Port to run server")
-	flag.StringVar(&portSr, "p", "", "Shorthand for port")
-	flag.BoolVar(&disableAuth, "noauth", false, "Disable authentication")
-	flag.BoolVar(&enableWal, "wal", false, "Enable write ahead log authentication")
-	flag.BoolVar(&disableCleanup, "nocleanup", false, "Disable auto cleanup")
-	flag.IntVar(&cleanupLimit, "cleanup-limit", 0, "Cleanup limit")
-	flag.IntVar(&cleanupInterval, "cleanup-interval", 1, "Cleanup interval in seconds")
-	flag.StringVar(&user, "user", "", "User for authentication")
-	flag.StringVar(&userSr, "u", "", "Shorthand for user")
-	flag.StringVar(&password, "password", "", "Password for authentication")
-	flag.StringVar(&passwordSr, "pwd", "", "Shorthand for password")
-	flag.Parse()
-
-	if port == "" {
-		if portSr != "" {
-			port = portSr
-		} else {
-			port = DefaultPort
-		}
-	}
-
-	if user == "" {
-		if userSr != "" {
-			user = userSr
-		} else {
-			user = DefaultUser
-		}
-	}
-
-	if password == "" {
-		if passwordSr != "" {
-			password = passwordSr
-		} else {
-			password = DefaultPassword
-		}
-	}
-
-	if cleanupLimit == 0 {
-		cleanupLimit = DefaultCleanupLimit
-	}
-
-	options := &ServerOptions{
-		Port:               port,
-		AuthEnabled:        !disableAuth,
-		WalEnabled:         enableWal,
-		AutoCleanupEnabled: !disableCleanup,
-		CleanupLimit:       cleanupLimit,
-		CleanupInterval:    time.Duration(cleanupInterval) * time.Second,
-		User:               user,
-		Password:           password,
-	}
-
-	return options
-}
-
-func FileExists(filename string) bool {
-	_, err := os.Stat(filename)
-	return !errors.Is(err, os.ErrNotExist)
 }
 
 func main() {
