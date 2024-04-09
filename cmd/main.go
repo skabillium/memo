@@ -66,6 +66,9 @@ func (c *MemoContext) End() {
 }
 
 func (s *Server) Execute(cmd *Command) any {
+	s.dbmu.Lock()
+	defer s.dbmu.Unlock()
+
 	switch cmd.Kind {
 	case CmdVersion:
 		return resp.SimpleString(MemoVersion)
@@ -223,6 +226,7 @@ type Server struct {
 	ln      net.Listener
 	quitCh  chan struct{}
 	options *ServerOptions
+	dbmu    sync.Mutex
 	db      *db.Database
 	walch   chan string
 
@@ -403,7 +407,10 @@ func (s *Server) runExpireJob() {
 	defer ticker.Stop()
 
 	for range ticker.C {
+		s.dbmu.Lock()
 		s.db.CleanupExpired(s.options.CleanupLimit)
+
+		s.dbmu.Unlock()
 	}
 }
 
