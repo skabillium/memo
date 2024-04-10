@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"os"
 	"skabillium/memo/cmd/db"
@@ -21,6 +20,8 @@ const DefaultUser = "memo"
 const DefaultPassword = "password"
 const CurrentRespVersion = "2"
 
+// Number of expired keys to remove every cleanup cycle
+// see: runExpireJob() and db.CleanupExpired()
 const DefaultCleanupLimit = 20
 
 var ErrNoAuth = errors.New("NOAUTH Authentication required")
@@ -28,6 +29,8 @@ var ErrWrongPass = errors.New("WRONGPASS invalid username-password pair or user 
 var ErrNoProto = errors.New("NOPROTO unsupported protocol version")
 var ErrUnsupportedType = errors.New("ERR unsupported type for request")
 
+// Helper struct for holding any connection specific information and communicating with
+// clients
 type MemoContext struct {
 	conn    net.Conn
 	rw      *bufio.ReadWriter
@@ -65,6 +68,7 @@ func (c *MemoContext) End() {
 	c.rw.Flush()
 }
 
+// Run a given command against the database
 func (s *Server) Execute(cmd *Command) any {
 	s.dbmu.Lock()
 	defer s.dbmu.Unlock()
@@ -226,7 +230,7 @@ type Server struct {
 	ln      net.Listener
 	quitCh  chan struct{}
 	options *ServerOptions
-	dbmu    sync.Mutex
+	dbmu    sync.Mutex // Mutex to synchronize db acces from different connections
 	db      *db.Database
 	walch   chan string
 
@@ -251,6 +255,7 @@ func NewServer(options *ServerOptions) *Server {
 	}
 }
 
+// Increment server connections count
 func (s *Server) newConn() {
 	s.connMu.Lock()
 	defer s.connMu.Unlock()
@@ -265,6 +270,8 @@ func (s *Server) closeConn(conn net.Conn) {
 	s.Info.Connections--
 }
 
+// If the Write Ahead Log is enabled, this function reads it and rebuilds the database from the
+// logged commands. It is meant to run only once, before the server is actually started.
 func (s *Server) BuildDbFromWal() (int, error) {
 	file, err := os.Open(WalName)
 	if err != nil {
@@ -302,6 +309,7 @@ func (s *Server) BuildDbFromWal() (int, error) {
 	return ops, nil
 }
 
+// Start server with the options provided by the cli
 func (s *Server) Start() error {
 	ln, err := net.Listen("tcp", "localhost:"+s.options.Port)
 	if err != nil {
@@ -332,6 +340,7 @@ func (s *Server) Start() error {
 	return nil
 }
 
+// Accept new connections
 func (s *Server) acceptLoop() {
 	for {
 		conn, err := s.ln.Accept()
@@ -345,6 +354,8 @@ func (s *Server) acceptLoop() {
 	}
 }
 
+// This executes when a new connection is created, it runs in a separate goroutine for
+// every connection and has it's own separate MemoContext.
 func (s *Server) handleConnection(conn net.Conn) {
 	defer s.closeConn(conn)
 
@@ -385,6 +396,9 @@ func (s *Server) handleConnection(conn net.Conn) {
 	}
 }
 
+// If authentication is enabled, this function checks if the command provided is the "hello"
+// or "auth" commands (the only commands that can perform authentication) and if the credentials
+// provided are correct.
 func (s *Server) CanExecute(ctx *MemoContext, command *Command) error {
 	if s.options.AuthEnabled && !ctx.hasAuth {
 		if command.Kind != CmdHello && command.Kind != CmdAuth {
@@ -401,6 +415,8 @@ func (s *Server) CanExecute(ctx *MemoContext, command *Command) error {
 	return nil
 }
 
+// Job to delete expired keys, by default it runs every second but can be customized
+// with the "cleanup-interval" cli option (in seconds)
 func (s *Server) runExpireJob() {
 	// Remove expired keys every second
 	ticker := time.NewTicker(s.options.CleanupInterval)
@@ -414,7 +430,9 @@ func (s *Server) runExpireJob() {
 	}
 }
 
-func main() {
+// The actual main function of the server, it reads and options provided
+// it instantiates the server and initialized the database
+func runServer() error {
 	options := getServerOptions()
 	server := NewServer(options)
 
@@ -430,5 +448,15 @@ func main() {
 		}
 	}
 
-	log.Fatal(server.Start())
+	return server.Start()
+}
+
+// Main is only responsible for running the runServer function and exiting with an error
+// if it occurs
+func main() {
+	err := runServer()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 }
