@@ -77,8 +77,9 @@ type Command struct {
 	Limit       int
 }
 
+// Parse command from string input
 func ParseCommand(message string) (*Command, error) {
-	split, err := sanitize(message)
+	split, err := splitTokens(message)
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +291,8 @@ func isWhitespace(b byte) bool {
 	return unicode.IsSpace(rune(b))
 }
 
-func sanitize(message string) ([]string, error) {
+// Split input string to distinct tokens, for example "this is a single token"
+func splitTokens(message string) ([]string, error) {
 	out := []string{}
 	i := 0
 
