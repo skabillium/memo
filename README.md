@@ -1,7 +1,9 @@
 # Memo
 
 Memo is a Redis-compliant in-memory database implemented in go. Other than basic key-value 
-functionalities it also supports lists, priority queues and sets.
+functionalities it also supports lists, priority queues and sets. Like Redis, it also
+supports the RESP protocol so it can be used with any Redis client library in your programming
+language of choice.
 
 Run the server with `make build && ./bin/memo`, this should start a memo server on `localhost:5678`
 
