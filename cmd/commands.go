@@ -307,7 +307,6 @@ func sanitize(message string) ([]string, error) {
 			start := i
 			c := message[i]
 			for i < len(message) && c != term {
-				// TODO: Parse special characters
 				c = message[i]
 				i++
 			}
