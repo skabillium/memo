@@ -7,6 +7,17 @@ language of choice.
 
 Run the server with `make build && ./bin/memo`, this should start a memo server on `localhost:5678`
 
+## Running the project
+Run `make start` to start the server at `localhost:5678` with default authentication:
+- User: memo
+- Password: password
+
+If you want to enable the Write Ahead log for persisting data between restarts, run the server
+with the `--wal` option. This will persist all queries to the `wal.log` file which will be read
+and executed in the next restart.
+
+For a complete list of supported CLI options run `make help`.
+
 ## List of supported commands
 - `PING`
 - `HELLO`

@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"net"
@@ -433,6 +434,12 @@ func (s *Server) runExpireJob() {
 // The actual main function of the server, it reads and options provided
 // it instantiates the server and initialized the database
 func runServer() error {
+	flag.Usage = func() {
+		fmt.Println("Memo server version", MemoVersion)
+		fmt.Println("Available options:")
+		flag.PrintDefaults()
+	}
+
 	options := getServerOptions()
 	server := NewServer(options)
 

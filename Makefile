@@ -2,6 +2,9 @@ CMD = ./cmd
 TEST = ./test
 BIN = ./bin/memo
 
+help:
+	go run ${CMD} --help
+
 install:
 	go mod download
 
