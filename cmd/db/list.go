@@ -6,6 +6,9 @@ type lNode struct {
 	prev  *lNode
 }
 
+// The Memo equivalent to a Redis List data structure, it's basically an doubly linked list
+// under the hood. For more info about Redis lists
+// see: https://redis.io/docs/latest/develop/data-types/lists/
 type List struct {
 	Length int
 	head   *lNode

@@ -15,14 +15,22 @@ func newPqItem(data string, priority int) pqItem {
 	return pqItem{data: data, priority: priority, insertedAt: time.Now().UnixMilli()}
 }
 
+// Check if an item is of lower priority from another, it first checks the priority
+// and if those are equal it checks the time created.
 func (item *pqItem) isLowerThan(other pqItem) bool {
 	return item.priority < other.priority || item.insertedAt < other.insertedAt
 }
 
+// Check if an item is of higher priority from another, it first checks the priority
+// and if those are equal it checks the time created.
 func (item *pqItem) isHigherThan(other pqItem) bool {
 	return item.priority >= other.priority || item.insertedAt >= other.insertedAt
 }
 
+// This Memo data structure has no Redis equivalent, it is an implementation of a
+// priority queue based on a Min Heap. A lower priority means that an item will be retrieved
+// first (eg. an item with priority 1 with be retrieved before an item with priority 2).
+// If the priorities are the same then the item which was creted first will be retrieved.
 type PriorityQueue struct {
 	Length int
 	items  []pqItem
@@ -69,6 +77,7 @@ func (p *PriorityQueue) Peek() string {
 	return p.items[0].data
 }
 
+// Move up to the correct position in the heap
 func (p *PriorityQueue) heapifyUp(idx int) {
 	if idx == 0 {
 		return
@@ -83,6 +92,7 @@ func (p *PriorityQueue) heapifyUp(idx int) {
 	}
 }
 
+// Move down to the correct position in the heap
 func (p *PriorityQueue) heapifyDown(idx int) {
 	if idx >= p.Length {
 		return

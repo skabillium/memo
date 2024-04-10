@@ -1,5 +1,7 @@
 package db
 
+// The Memo equivalent to a Redis Set data structure,
+// see: https://redis.io/docs/latest/develop/data-types/sets/
 type Set struct {
 	Size  int
 	items map[string]bool

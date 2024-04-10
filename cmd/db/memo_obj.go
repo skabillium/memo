@@ -11,6 +11,9 @@ const (
 	ObjSet
 )
 
+// The base object that is stored in the database, all Memo data structures are a type of
+// MemoObj. Some utility functions are also provided for casting the object to specific data
+// structures.
 type MemoObj struct {
 	Kind      MemoObjType
 	Value     string
@@ -57,6 +60,7 @@ func (obj *MemoObj) ExpireIn(seconds int) {
 	obj.ExpiresAt = time.Now().Unix() + int64(seconds)
 }
 
+// Check if object has expired
 func (obj *MemoObj) hasExpired() bool {
-	return obj.ExpiresAt != 0 && obj.ExpiresAt < time.Now().Unix()
+	return obj.ExpiresAt != 0 && obj.ExpiresAt < time.Now().UnixMilli()
 }
