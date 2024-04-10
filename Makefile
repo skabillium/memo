@@ -2,6 +2,9 @@ CMD = ./cmd
 TEST = ./test
 BIN = ./bin/memo
 
+install:
+	go mod download
+
 clean:
 	rm -rf ./bin
 
@@ -18,3 +21,6 @@ dev:
 
 build:
 	go build -o ${BIN} ${CMD}
+
+prod: clean build
+	${BIN}
