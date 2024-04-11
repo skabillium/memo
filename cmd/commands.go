@@ -33,6 +33,7 @@ const (
 	CmdFlushAll
 	CmdCleanup
 	CmdExpire
+	CmdQuit
 	// KV
 	CmdSet
 	CmdGet
@@ -91,6 +92,8 @@ func ParseCommand(message string) (*Command, error) {
 
 	cmd := strings.ToLower(split[0])
 	switch cmd {
+	case "quit":
+		return &Command{Kind: CmdQuit}, nil
 	case "version":
 		if argc != 1 {
 			return nil, ErrInvalidNArg(cmd)

@@ -72,6 +72,17 @@ func TestParseServerCommands(t *testing.T) {
 	if res, _ = ParseCommand(str); !reflect.DeepEqual(cmd, res) {
 		t.Error("Expected result to be:", cmd, "got", res)
 	}
+
+	str = "quit"
+	cmd = &Command{Kind: CmdQuit}
+	if res, _ = ParseCommand(str); !reflect.DeepEqual(cmd, res) {
+		t.Error("Expected result to be:", cmd, "got", res)
+	}
+
+	str = "quit with other garbage"
+	if res, _ = ParseCommand(str); !reflect.DeepEqual(cmd, res) {
+		t.Error("Expected result to be:", cmd, "got", res)
+	}
 }
 
 func TestParseHelloCommand(t *testing.T) {

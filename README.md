@@ -19,6 +19,7 @@ and executed in the next restart.
 For a complete list of supported CLI options run `make help`.
 
 ## List of supported commands
+- `QUIT`
 - `PING`
 - `HELLO`
 - `INFO`

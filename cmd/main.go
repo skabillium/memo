@@ -382,6 +382,10 @@ func (s *Server) handleConnection(conn net.Conn) {
 			continue
 		}
 
+		if command.Kind == CmdQuit {
+			break
+		}
+
 		if err = s.CanExecute(ctx, command); err != nil {
 			ctx.EndWith(err)
 			continue
